@@ -56,7 +56,7 @@ Otomatik başlatmayı kapatmak için `Win+R` → `shell:startup` klasöründeki 
 - Zamanı gelince Windows bildirimi çıkar. Bildirime tıklayarak **10 dakika sonra hatırlat** seçebilirsiniz. Bu işlem haftalık programı değiştirmez.
 - **Bu tekrarı atla**, sıradaki takvim zamanını atlar. **Duraklat / devam ettir** programı silmeden kapatıp açar.
 - Tamamlandı düğmesi bulunmaz; hatırlatmalar görev veya deadline'ı geçenler listelerine eklenmez.
-- Silinen hatırlatmalar bu bölümde **Son silinenleri göster** seçeneğinden 10 dakika geri alınabilir.
+- Silinen hatırlatmalar bu bölümün sağındaki **Son silinenler** sekmesinden 10 dakika geri alınabilir.
 - Uygulama kapalıyken geçen eski bildirimler birikmez. Açılışta son 15 dakikada gelen bir hatırlatma gösterilebilir; daha eskileri sonraki takvim zamanına ilerler.
 
 ## Odak sayacı

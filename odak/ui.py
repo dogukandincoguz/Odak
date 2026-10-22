@@ -10,13 +10,14 @@ from PySide6.QtCore import QDate, QLocale, QPointF, QRectF, QSize, Qt, QTime, QT
 from PySide6.QtGui import (QColor, QFont, QFontDatabase, QIcon, QKeySequence, QPainter,
                            QPainterPath, QPen, QPixmap, QShortcut)
 from PySide6.QtWidgets import (QApplication, QCheckBox, QDateEdit, QDialog,
-    QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton,
-    QScrollArea, QSizePolicy, QSystemTrayIcon, QTextEdit, QTimeEdit,
+    QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QLineEdit, QMenu, QMessageBox, QPushButton,
+    QScrollArea, QSizePolicy, QSystemTrayIcon, QTextEdit,
     QStackedWidget, QToolButton, QVBoxLayout, QWidget)
 
 from .model import Store, Task, UNDO_SECONDS, category, make_deadline, time_label
 from .backups import Backups, export_json, import_json
 from .schedule import suggest_date
+from .controls import TimeField, field_style
 
 COLORS = {"neutral": "#9a8bff", "urgent": "#ff828e", "soon": "#efc575",
           "overdue": "#ff828e", "done": "#80d3b5", "trash": "#9cacc2", "someday": "#9cacc2"}
@@ -62,11 +63,6 @@ QLabel#filterBadge { font-size: 10px; font-weight: 600; border: none;
 QToolButton { background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 5px; }
 QToolButton:hover { background: #303a50; }
 QToolButton:focus { border-color: #a799ff; }
-QLineEdit, QTextEdit, QDateEdit, QTimeEdit, QComboBox, QSpinBox { background: #101722; border: 1px solid #354158;
-    border-radius: 9px; padding: 9px; selection-background-color: #6555ae; }
-QLineEdit:focus, QTextEdit:focus, QDateEdit:focus, QTimeEdit:focus { border-color: #a799ff; }
-QDateEdit:disabled, QTimeEdit:disabled { color: #59677c; background: #161d29; border-color: #253044; }
-QDateEdit::drop-down { border: none; width: 24px; }
 QCheckBox { spacing: 9px; }
 QCheckBox::indicator { width: 17px; height: 17px; border: 1px solid #5e6a83; border-radius: 5px; background: #101722; }
 QCheckBox::indicator:checked { background: #a799ff; border-color: #a799ff; image: url(none); }
@@ -93,7 +89,7 @@ def configure_app(app: QApplication):
             QFontDatabase.addApplicationFont(str(font_dir / filename))
     app.setFont(QFont("Segoe UI", 10))
     app.setStyle("Fusion")
-    app.setStyleSheet(STYLE)
+    app.setStyleSheet(STYLE + field_style())
     QLocale.setDefault(QLocale("tr_TR"))
 
 
@@ -174,9 +170,10 @@ def tool(kind: str, hint: str, callback, color: str = "#aebbd0") -> QToolButton:
 
 
 class CountTab(QPushButton):
-    def __init__(self, caption: str):
+    def __init__(self, caption: str, unit: str = "görev"):
         super().__init__()
         self.caption = caption
+        self.unit = unit
         self.setObjectName("filterTab")
         self.setCheckable(True)
         self.setFixedHeight(44)
@@ -201,7 +198,7 @@ class CountTab(QPushButton):
     def set_count(self, count: int):
         self.badge.setText(str(count))
         self.badge.setVisible(count > 0)
-        self.setAccessibleName(f"{self.caption}, {count} görev")
+        self.setAccessibleName(f"{self.caption}, {count} {self.unit}")
 
     def update_colors(self, checked: bool):
         self.caption_label.setStyleSheet("color: #e3dcff;" if checked else "color: #aebbd0;")
@@ -354,7 +351,7 @@ class TaskDialog(QDialog):
         date_column.addWidget(self.date)
         time_column = QVBoxLayout()
         self.use_time = QCheckBox("Saat ekle")
-        self.clock = QTimeEdit()
+        self.clock = TimeField()
         self.clock.setDisplayFormat("HH:mm")
         self.clock.setTime(QTime(task.deadline.time()) if task and task.deadline else QTime.currentTime().addSecs(3600))
         self.clock.setAccessibleName("Deadline saati")
@@ -657,6 +654,7 @@ class MainWindow(QWidget):
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.list_widget = QWidget()
         self.task_layout = QVBoxLayout(self.list_widget)
+        self.task_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         self.task_layout.setContentsMargins(0, 0, 5, 0)
         self.task_layout.setSpacing(14)
         self.task_layout.setAlignment(Qt.AlignmentFlag.AlignTop)

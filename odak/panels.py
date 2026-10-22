@@ -5,13 +5,14 @@ import time
 from datetime import datetime
 
 from PySide6.QtCore import QLocale, QDate, Qt, QTime
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFrame, QGridLayout,
-    QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QSpinBox, QTextEdit,
-    QTimeEdit, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QDialog, QFrame, QGridLayout,
+    QHBoxLayout, QLabel, QLayout, QLineEdit, QPushButton, QScrollArea, QSizePolicy, QTextEdit,
+    QVBoxLayout, QWidget)
 
 from .model import Reminder, UNDO_SECONDS, category
 from .schedule import DAYS, DAY_SHORTS
-from .ui import app_icon, icon, label, tool
+from .ui import CountTab, app_icon, icon, label, tool
+from .controls import ChoiceBox, Stepper, TimeField
 
 
 class ReminderDialog(QDialog):
@@ -20,6 +21,7 @@ class ReminderDialog(QDialog):
         self.setWindowTitle("Hatırlatmayı düzenle" if reminder else "Yeni düzenli hatırlatma")
         self.setWindowIcon(app_icon())
         self.setMinimumWidth(400)
+        self.resize(420, min(660, self.screen().availableGeometry().height() - 64))
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(13)
@@ -58,7 +60,7 @@ class ReminderDialog(QDialog):
             presets.addWidget(button)
         layout.addLayout(presets)
         layout.addWidget(label("Hatırlatma saati", "muted"))
-        self.clock = QTimeEdit()
+        self.clock = TimeField()
         self.clock.setDisplayFormat("HH:mm")
         self.clock.setTime(QTime.fromString(reminder.clock, "HH:mm") if reminder else QTime(9, 0))
         self.clock.setAccessibleName("Hatırlatma saati")
@@ -97,6 +99,7 @@ class ReminderPanel(QWidget):
         super().__init__()
         self.owner = owner
         self.snapshot = None
+        self.current_tab = "active"
         body = QVBoxLayout(self)
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(12)
@@ -113,20 +116,42 @@ class ReminderPanel(QWidget):
         self.search.setAccessibleName("Hatırlatmalarda ara")
         self.search.textChanged.connect(lambda: self.refresh(force=True))
         body.addWidget(self.search)
-        self.deleted = QCheckBox("Son silinenleri göster · 10 dk geri alma")
-        self.deleted.toggled.connect(lambda: self.refresh(force=True))
-        body.addWidget(self.deleted)
+        filters = QFrame()
+        filters.setObjectName("tabs")
+        filter_row = QHBoxLayout(filters)
+        filter_row.setContentsMargins(0, 0, 0, 0)
+        filter_row.setSpacing(8)
+        self.tabs = {}
+        for key, text in (("active", "Hatırlatmalar"), ("trash", "Son silinenler")):
+            button = CountTab(text, "hatırlatma")
+            button.setChecked(key == self.current_tab)
+            button.clicked.connect(lambda checked=False, tab=key: self.set_tab(tab))
+            filter_row.addWidget(button, 1)
+            self.tabs[key] = button
+        body.addWidget(filters)
+        self.section_hint = label("Silinen hatırlatmaları 10 dakika içinde geri alabilirsin.", "muted", True)
+        self.section_hint.hide()
+        body.addWidget(self.section_hint)
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         content = QWidget()
         self.list_layout = QVBoxLayout(content)
+        self.list_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         self.list_layout.setContentsMargins(0, 0, 5, 0)
         self.list_layout.setSpacing(10)
         self.list_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.scroll.setWidget(content)
         body.addWidget(self.scroll, 1)
         self.countdowns = []
+
+    def set_tab(self, tab: str):
+        self.current_tab = tab
+        for key, button in self.tabs.items():
+            button.setChecked(key == tab)
+        self.section_hint.setVisible(tab == "trash")
+        self.refresh(force=True)
+        self.scroll.verticalScrollBar().setValue(0)
 
     def change(self, action, message):
         self.owner.perform(action, message)
@@ -140,18 +165,21 @@ class ReminderPanel(QWidget):
         if accepted:
             self.change(lambda: self.owner.store.save_reminder(**values, reminder_id=reminder.id if reminder else None),
                         "Hatırlatma kaydedildi.")
+            self.set_tab("active")
             self.owner.set_view("reminders")
 
     def refresh(self, force=False):
         from .ui import search_key
         reminders = self.owner.store.reminders()
-        reminders = [r for r in reminders if (r.deleted_at is not None) == self.deleted.isChecked()]
+        self.tabs["active"].set_count(sum(r.deleted_at is None for r in reminders))
+        self.tabs["trash"].set_count(sum(r.deleted_at is not None for r in reminders))
+        reminders = [r for r in reminders if (r.deleted_at is not None) == (self.current_tab == "trash")]
         query = search_key(self.search.text().strip())
         reminders = [r for r in reminders if not query or query in search_key(r.title + " " + r.notes)]
         for countdown, deleted_at in self.countdowns:
             remaining = max(0, math.ceil(deleted_at + UNDO_SECONDS - time.time()))
             countdown.setText(f"Geri alma süresi: {remaining // 60}:{remaining % 60:02d}")
-        snapshot = tuple(reminders)
+        snapshot = (self.current_tab, query, tuple(reminders))
         if not force and snapshot == self.snapshot:
             return
         self.snapshot = snapshot
@@ -162,7 +190,10 @@ class ReminderPanel(QWidget):
                 item.widget().deleteLater()
         self.countdowns = []
         if not reminders:
-            empty = label("Henüz bir hatırlatma yok.\nBir program ekle, zamanı gelince haber verelim.", "muted", True)
+            text = "Son silinenlerde hatırlatma yok.\nSilinenler 10 dakika boyunca burada bekler." if self.current_tab == "trash" else "Henüz bir hatırlatma yok.\nBir program ekle, zamanı gelince haber verelim."
+            if query:
+                text = "Sonuç bulunamadı.\nBaşka bir kelimeyle aramayı dene."
+            empty = label(text, "muted", True)
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             empty.setContentsMargins(20, 40, 20, 20)
             self.list_layout.addWidget(empty)
@@ -171,6 +202,7 @@ class ReminderPanel(QWidget):
 
     def card(self, reminder: Reminder):
         card = QFrame()
+        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
         card.setObjectName("reminderCard")
         accent = "#718098" if reminder.paused else "#80d3b5"
         card.setStyleSheet(f"QFrame#reminderCard {{background: #1a2231; border: 1px solid #2b374c; border-left: 3px solid {accent}; border-radius: 12px;}}")
@@ -259,7 +291,8 @@ class FocusPanel(QWidget):
         body.setSpacing(16)
         body.addWidget(label("Bir işe yer aç.", "section"))
         body.addWidget(label("Bir görev seç, süreyi başlat. Çalışma ve mola arasında kendi ritmini bul.", "muted", True))
-        self.task = QComboBox()
+        body.addWidget(label("Odaklanacağın görev", "muted"))
+        self.task = ChoiceBox()
         self.task.setAccessibleName("Odaklanılacak görev")
         body.addWidget(self.task)
         self.phase_label = label("ODAK ZAMANI", "eyebrow")
@@ -275,18 +308,20 @@ class FocusPanel(QWidget):
         body.addWidget(self.hint)
         body.addStretch()
         durations = QHBoxLayout()
-        self.work = QSpinBox()
+        durations.setSpacing(16)
+        self.work = Stepper()
         self.work.setRange(1, 180)
         self.work.setValue(preferences.get("work", 25))
         self.work.setSuffix(" dk")
         self.work.setAccessibleName("Çalışma süresi")
-        self.rest = QSpinBox()
+        self.rest = Stepper()
         self.rest.setRange(1, 60)
         self.rest.setValue(preferences.get("rest", 5))
         self.rest.setSuffix(" dk")
         self.rest.setAccessibleName("Mola süresi")
         for title, spin in (("Çalışma", self.work), ("Mola", self.rest)):
             column = QVBoxLayout()
+            column.setSpacing(8)
             column.addWidget(label(title, "muted"))
             column.addWidget(spin)
             durations.addLayout(column)
@@ -329,11 +364,12 @@ class FocusPanel(QWidget):
         current = self.task.currentData()
         self.task.blockSignals(True)
         self.task.clear()
-        self.task.addItem("Serbest odak", None)
+        self.task.addItem(icon("clock"), "Serbest odak", None)
         for identity, title in snapshot:
-            self.task.addItem(title, identity)
+            self.task.addItem(icon("circle", "#a799ff"), title, identity)
         self.choose_task(current)
         self.task.blockSignals(False)
+        self.task.setToolTip(self.task.currentText())
 
     def choose_task(self, identity):
         index = self.task.findData(identity)
