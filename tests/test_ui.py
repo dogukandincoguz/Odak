@@ -3,7 +3,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import tempfile
 import unittest
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
@@ -59,7 +59,7 @@ class UiTests(unittest.TestCase):
             QTest.keyClicks(dialog.title, "A new task")
             QTest.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
         QTimer.singleShot(30, fill_form)
-        add_button = self.window.findChild(QPushButton, "primary")
+        add_button = self.window.add_task_button
         QTest.mouseClick(add_button, Qt.MouseButton.LeftButton)
         self.assertEqual(self.store.all()[0].title, "A new task")
         self.assertEqual(len(self.window.cards), 1)
@@ -114,6 +114,92 @@ class UiTests(unittest.TestCase):
         self.assertIsNone(dialog.values()["deadline"])
         self.assertEqual(dialog.values()["title"], "<b>Başlık</b>")
         dialog.deleteLater()
+
+    def test_natural_date_requires_apply_and_then_sets_form_fields(self):
+        dialog = TaskDialog(self.window)
+        dialog.title.setText("Yarın 18.00 raporu gönder")
+        self.assertIsNone(dialog.values()["deadline"])
+        dialog.apply_suggestion()
+        values = dialog.values()
+        self.assertEqual(values["title"], "raporu gönder")
+        self.assertEqual(values["deadline"].date(), date.today() + timedelta(days=1))
+        self.assertEqual(values["deadline"].hour, 18)
+        dialog.deleteLater()
+
+    def test_today_selection_resets_by_date_and_someday_is_separate(self):
+        identity = self.store.save("Bugünkü iş", today=True)
+        self.store.save("Gelecekteki fikir", deadline=datetime(2000, 1, 1), someday=True)
+        self.window.set_tab("today")
+        self.assertEqual([c.task.title for c in self.window.cards], ["Bugünkü iş"])
+        with self.store.db:
+            self.store.db.execute("UPDATE tasks SET today=? WHERE id=?", ((date.today() - timedelta(days=1)).isoformat(), identity))
+        self.window.refresh(force=True)
+        self.assertEqual(self.window.cards, [])
+        self.window.set_tab("someday")
+        self.assertEqual([c.task.title for c in self.window.cards], ["Gelecekteki fikir"])
+        self.window.set_tab("overdue")
+        self.assertEqual(self.window.cards, [])
+
+    def test_reminders_are_separate_and_notification_snoozes_without_tasks(self):
+        from odak.panels import ReminderDialog
+        dialog = ReminderDialog(self.window)
+        self.assertFalse(dialog.save_button.isEnabled())
+        dialog.title.setText("Toplantı")
+        self.assertTrue(dialog.save_button.isEnabled())
+        identity = self.store.save_reminder(**dialog.values())
+        moment = self.store.reminders()[0].next_at
+        due = self.store.due_reminders(moment)
+        self.assertEqual(len(due), 1)
+        self.store.snooze_reminder(identity, moment)
+        self.assertEqual(self.store.all(), [])
+        self.window.set_view("reminders")
+        self.assertEqual(self.window.current_view, "reminders")
+        self.assertEqual(self.window.page_stack.currentWidget(), self.window.reminder_panel)
+        self.assertFalse(any(b.accessibleName() == "Tamamlandı işaretle" for b in self.window.reminder_panel.findChildren(QPushButton)))
+        dialog.deleteLater()
+
+    def test_focus_pause_resume_completion_and_persistence_without_session_history(self):
+        from unittest.mock import Mock
+        focus = self.window.focus_panel
+        self.window.system_notice = Mock()
+        focus.work.setValue(1)
+        focus.toggle()
+        self.assertTrue(focus.running)
+        end = focus.end_at
+        focus.tick(end + 1)
+        self.assertFalse(focus.running)
+        self.assertEqual(focus.phase, "break")
+        self.window.system_notice.assert_called_once()
+        focus.toggle()
+        self.assertTrue(focus.running)
+        focus.toggle()
+        self.assertFalse(focus.running)
+        keys = [r[0] for r in self.store.db.execute("SELECT key FROM settings")]
+        self.assertEqual(sorted(keys), ["focus_preferences", "focus_session"])
+        self.assertEqual(self.store.all(), [])
+
+    def test_notification_snooze_dialog_keeps_regular_calendar(self):
+        self.store.save_reminder("Toplantı", "not", [0], "14:00")
+        reminder = self.store.reminders()[0]
+        def snooze():
+            dialog = self.app.activeModalWidget()
+            button = next(b for b in dialog.findChildren(QPushButton) if b.text() == "10 dakika sonra hatırlat")
+            QTest.mouseClick(button, Qt.MouseButton.LeftButton)
+        QTimer.singleShot(30, snooze)
+        self.window.reminder_panel.show_alert(reminder)
+        updated = self.store.reminders()[0]
+        self.assertEqual(updated.next_at, reminder.next_at)
+        self.assertAlmostEqual((updated.snooze_at - datetime.now()).total_seconds(), 600, delta=2)
+        self.assertEqual(self.store.all(), [])
+
+    def test_large_history_is_shown_in_batches(self):
+        for number in range(125):
+            self.store.save(f"İş {number}")
+        self.window.refresh(force=True)
+        self.assertEqual(self.window.count_label.text(), "125 görev")
+        self.assertEqual(len(self.window.cards), 100)
+        self.window.show_more()
+        self.assertEqual(len(self.window.cards), 125)
 
 
 if __name__ == "__main__":

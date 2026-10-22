@@ -15,11 +15,12 @@ os.environ["QT_QPA_PLATFORM"] = "windows"
 PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT))
 
-from PySide6.QtCore import QPoint, QTimer, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QTimer, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 from odak.model import Store
 from odak.ui import MainWindow, TaskDialog, configure_app
+from odak.panels import ReminderDialog
 
 user32 = ctypes.windll.user32
 user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
@@ -83,6 +84,52 @@ with tempfile.TemporaryDirectory() as directory, closing(Store(Path(directory) /
     assert store.all()[0].title == "Edited native task"
     assert store.all()[0].deadline is None
     assert user32.IsWindowEnabled(int(window.winId()))
+
+    def fill_reminder():
+        dialog = app.activeModalWidget()
+        try:
+            assert isinstance(dialog, ReminderDialog)
+            hwnd = int(dialog.winId())
+            assert user32.GetWindowLongW(hwnd, -20) & 0x8
+            assert user32.GetWindowLongW(hwnd, -20) & 0x80
+            assert user32.IsWindowEnabled(hwnd)
+            QTest.keyClicks(dialog.title, "Weekly native reminder")
+            dialog.select_days([0, 4])
+            assert dialog.save_button.isEnabled()
+            QTest.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
+        except BaseException:
+            failures.append(traceback.format_exc())
+            if isinstance(dialog, QDialog):
+                dialog.reject()
+
+    from PySide6.QtWidgets import QDialog
+    window.set_view("reminders")
+    QTimer.singleShot(200, fill_reminder)
+    window.reminder_panel.edit_reminder()
+    if failures:
+        raise AssertionError("\n".join(failures))
+    assert store.reminders()[0].weekdays == (0, 4)
+    assert len(store.all()) == 1, "Reminders must never create task rows"
+
+    def select_export_file():
+        from PySide6.QtWidgets import QFileDialog
+        dialog = app.activeModalWidget()
+        try:
+            assert isinstance(dialog, QFileDialog)
+            assert user32.GetWindowLongW(int(dialog.winId()), -20) & 0x8
+            dialog.selectFile(str(Path(directory) / "native-export.json"))
+            dialog.accept()
+        except BaseException:
+            failures.append(traceback.format_exc())
+            dialog.reject()
+    QTimer.singleShot(200, select_export_file)
+    window.export_data()
+    if failures:
+        raise AssertionError("\n".join(failures))
+    assert (Path(directory) / "native-export.json").exists()
     window.timer.stop()
     window.hide()
-print("Native Windows check: form on top, taskbar hidden, input, add, edit and save OK.")
+    window.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    app.processEvents()
+print("Native Windows check: task and reminder forms on top, taskbar hidden, input, add, edit and save OK.")
