@@ -47,10 +47,18 @@ QPushButton#primary { background: #a799ff; color: #14132a; border: 1px solid #a7
 QPushButton#primary:hover { background: #bcafff; }
 QPushButton#primary:disabled { background: #3c3a54; color: #8d88a6; border-color: #3c3a54; }
 QPushButton#tab { background: transparent; color: #96a3b8; border: none;
-                 border-radius: 8px; padding: 9px 7px; font-size: 11px; }
+                 border-radius: 9px; padding: 11px 10px; font-size: 12px; }
 QPushButton#tab:hover { background: #202a3b; color: #e8edf7; }
 QPushButton#tab:checked { background: #2a2c46; color: #d5cdff; }
-QFrame#tabs { background: #171f2d; border-radius: 11px; }
+QFrame#tabs { background: transparent; border: none; }
+QPushButton#filterTab { background: #192232; border: 1px solid #2b374b;
+    border-radius: 11px; padding: 0; }
+QPushButton#filterTab:hover { background: #222d40; border-color: #48556f; }
+QPushButton#filterTab:checked { background: #2a2944; border-color: #62558e; }
+QPushButton#filterTab:focus { border-color: #a799ff; }
+QLabel#filterCaption { font-size: 12px; font-weight: 600; }
+QLabel#filterBadge { font-size: 10px; font-weight: 600; border: none;
+    border-radius: 7px; padding: 0 6px; }
 QToolButton { background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 5px; }
 QToolButton:hover { background: #303a50; }
 QToolButton:focus { border-color: #a799ff; }
@@ -163,6 +171,42 @@ def tool(kind: str, hint: str, callback, color: str = "#aebbd0") -> QToolButton:
     result.setAccessibleName(hint)
     result.clicked.connect(callback)
     return result
+
+
+class CountTab(QPushButton):
+    def __init__(self, caption: str):
+        super().__init__()
+        self.caption = caption
+        self.setObjectName("filterTab")
+        self.setCheckable(True)
+        self.setFixedHeight(44)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(10, 0, 10, 0)
+        row.setSpacing(8)
+        self.caption_label = label(caption, "filterCaption")
+        self.caption_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        row.addWidget(self.caption_label)
+        row.addStretch()
+        self.badge = label("", "filterBadge")
+        self.badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.badge.setMinimumWidth(22)
+        self.badge.setFixedHeight(22)
+        row.addWidget(self.badge)
+        self.toggled.connect(self.update_colors)
+        self.update_colors(False)
+        self.set_count(0)
+
+    def set_count(self, count: int):
+        self.badge.setText(str(count))
+        self.badge.setVisible(count > 0)
+        self.setAccessibleName(f"{self.caption}, {count} görev")
+
+    def update_colors(self, checked: bool):
+        self.caption_label.setStyleSheet("color: #e3dcff;" if checked else "color: #aebbd0;")
+        self.badge.setStyleSheet("background: #494067; color: #e9e2ff;" if checked
+                                else "background: #293448; color: #aebbd0;")
 
 
 def choose_file(parent, title: str, location: str, pattern: str, saving=False) -> str:
@@ -395,10 +439,10 @@ class TaskCard(QFrame):
         self.setStyleSheet(f"QFrame#taskCard {{ background: #1a2231; border: 1px solid #2b374c; border-left: 3px solid {accent}; border-radius: 12px; }}")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
         body = QVBoxLayout(self)
-        body.setContentsMargins(12, 12, 10, 11)
-        body.setSpacing(7)
+        body.setContentsMargins(15, 14, 12, 14)
+        body.setSpacing(9)
         top = QHBoxLayout()
-        top.setSpacing(8)
+        top.setSpacing(10)
         if self.kind != "trash":
             top.addWidget(tool("check" if self.kind == "done" else "circle",
                 "Yeniden aç" if self.kind == "done" else "Tamamlandı işaretle",
@@ -504,8 +548,8 @@ class MainWindow(QWidget):
         surface.setObjectName("surface")
         outer.addWidget(surface)
         body = QVBoxLayout(surface)
-        body.setContentsMargins(20, 18, 20, 14)
-        body.setSpacing(14)
+        body.setContentsMargins(24, 22, 24, 18)
+        body.setSpacing(16)
 
         self.drag_header = DragHeader(self)
         header = QHBoxLayout(self.drag_header)
@@ -531,7 +575,7 @@ class MainWindow(QWidget):
 
         shell_body = body
         navigation = QHBoxLayout()
-        navigation.setSpacing(4)
+        navigation.setSpacing(8)
         self.view_buttons = {}
         for key, text in (("tasks", "Görevler"), ("reminders", "Hatırlatmalar"), ("focus", "Odaklan")):
             button = QPushButton(text)
@@ -546,14 +590,14 @@ class MainWindow(QWidget):
         task_page = QWidget()
         body = QVBoxLayout(task_page)
         body.setContentsMargins(0, 0, 0, 0)
-        body.setSpacing(10)
+        body.setSpacing(14)
         self.page_stack.addWidget(task_page)
 
         summary = QFrame()
         summary.setObjectName("summary")
         stats = QHBoxLayout(summary)
-        stats.setContentsMargins(16, 12, 16, 14)
-        stats.setSpacing(4)
+        stats.setContentsMargins(18, 14, 18, 16)
+        stats.setSpacing(12)
         self.stat_values = {}
         for key, caption, color in (("active", "Açık görev", "#e8edf7"),
                                     ("urgent", "24 saat içinde", "#ff828e"),
@@ -572,7 +616,7 @@ class MainWindow(QWidget):
         self.add_task_button = add_button
         add_button.setObjectName("primary")
         add_button.setIcon(icon("plus", "#14132a"))
-        add_button.setFixedHeight(43)
+        add_button.setFixedHeight(46)
         add_button.setToolTip("Yeni görev · Ctrl+N")
         add_button.clicked.connect(lambda: self.edit_task())
         body.addWidget(add_button)
@@ -586,14 +630,12 @@ class MainWindow(QWidget):
         tabs = QFrame()
         tabs.setObjectName("tabs")
         tab_row = QGridLayout(tabs)
-        tab_row.setContentsMargins(4, 4, 4, 4)
-        tab_row.setSpacing(1)
+        tab_row.setContentsMargins(0, 0, 0, 0)
+        tab_row.setSpacing(8)
         self.tabs = {}
         for index, (key, text) in enumerate((("active", "Liste"), ("today", "Bugün"), ("someday", "Bir gün"),
                                            ("overdue", "Geçenler"), ("done", "Bitenler"), ("trash", "Silinenler"))):
-            button = QPushButton(text)
-            button.setObjectName("tab")
-            button.setCheckable(True)
+            button = CountTab(text)
             button.clicked.connect(lambda checked=False, k=key: self.set_tab(k))
             tab_row.addWidget(button, index // 3, index % 3)
             self.tabs[key] = button
@@ -616,7 +658,7 @@ class MainWindow(QWidget):
         self.list_widget = QWidget()
         self.task_layout = QVBoxLayout(self.list_widget)
         self.task_layout.setContentsMargins(0, 0, 5, 0)
-        self.task_layout.setSpacing(10)
+        self.task_layout.setSpacing(14)
         self.task_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.scroll.setWidget(self.list_widget)
         body.addWidget(self.scroll, 1)
@@ -664,8 +706,8 @@ class MainWindow(QWidget):
         if screen is None:
             return
         rect = screen.availableGeometry()
-        width = min(420, rect.width() - 24)
-        height = min(800, rect.height() - 32)
+        width = min(460, rect.width() - 24)
+        height = min(840, rect.height() - 32)
         self.setFixedSize(width, height)
         self.move(rect.right() - width - 15, rect.top() + 16)
 
@@ -787,9 +829,8 @@ class MainWindow(QWidget):
         self.stat_values["urgent"].setText(str(urgent))
         self.stat_values["done"].setText(str(len(groups["done"])))
         self.date_label.setText(QLocale("tr_TR").toString(QDate.currentDate(), "d MMM, ddd"))
-        for key, text in (("active", "Liste"), ("today", "Bugün"), ("someday", "Bir gün"), ("overdue", "Geçenler"),
-                          ("done", "Bitenler"), ("trash", "Silinenler")):
-            self.tabs[key].setText(f"{text} {len(groups[key])}")
+        for key, button in self.tabs.items():
+            button.set_count(len(groups[key]))
         shown = groups[self.current_tab]
         if self.current_tab in ("active", "overdue", "today", "someday"):
             shown.sort(key=lambda t: (t.deadline or datetime.max, -t.created_at))
@@ -801,6 +842,7 @@ class MainWindow(QWidget):
         if query:
             shown = [t for t in shown if query in search_key(t.title + " " + t.notes)]
         self.count_label.setText(f"{len(shown)} görev")
+        self.count_label.setVisible(bool(query))
         total = len(shown)
         shown = shown[:self.display_limit]
         snapshot = (self.current_tab, total, tuple((t, category(t, now)) for t in shown))
