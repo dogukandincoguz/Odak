@@ -3,7 +3,9 @@
 param(
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'Programs\Odak'),
     [string]$DataDir = '',
-    [string]$Ref = 'dev',
+    [string]$Ref = '13598e705eb974765e218f9b159c721e53645f24',
+    [ValidatePattern('^$|^[a-fA-F0-9]{64}$')]
+    [string]$SourceSha256 = '',
     [string]$GitHubToken = $env:ODAK_GITHUB_TOKEN,
     [string]$LegacyDataDir = '',
     [string]$SourceArchive = '',
@@ -28,6 +30,64 @@ param(
     $workName = 'odak-install-' + [guid]::NewGuid().ToString('N')
     $workPath = Join-Path $temporaryParent $workName
 
+    function Assert-OdakFileHash {
+        param([string]$Path, [string]$Expected)
+        if ((Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -ne $Expected) {
+            throw 'SHA-256 dogrulamasi basarisiz. Indirilen dosya calistirilmadi.'
+        }
+    }
+
+    function Get-OdakSourceHash {
+        param([string]$Path)
+        # Hash file names and contents, independent of ZIP timestamps/compression.
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $archive = [IO.Compression.ZipFile]::OpenRead($Path)
+        $digests = New-Object 'Collections.Generic.SortedDictionary[string,string]' ([StringComparer]::Ordinal)
+        $seen = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+        $root = $null
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try {
+            foreach ($entry in $archive.Entries) {
+                $name = $entry.FullName
+                if ($name -match '[\\:\x00-\x1f<>"|?*]' -or $name.StartsWith('/')) { throw 'Arsivda gecersiz bir yol var.' }
+                $parts = $name.TrimEnd('/').Split('/')
+                if (@($parts | Where-Object { -not $_ -or $_ -eq '.' -or $_ -eq '..' -or $_.EndsWith('.') -or $_.EndsWith(' ') }).Count) {
+                    throw 'Arsivda gecersiz bir yol var.'
+                }
+                if ($null -eq $root) { $root = $parts[0] }
+                if ($parts[0] -cne $root) { throw 'Arsiv tek bir kok klasor icermeli.' }
+                if ((($entry.ExternalAttributes -shr 16) -band 61440) -eq 40960) { throw 'Arsiv sembolik bag iceriyor.' }
+                if ($name.EndsWith('/')) { continue }
+                if ($parts.Count -lt 2) { throw 'Arsiv dosyalari kok klasorun altinda olmali.' }
+                $relative = $name.Substring($root.Length + 1)
+                if (-not $seen.Add($relative)) { throw 'Arsivda yinelenen dosya yolu var.' }
+                $stream = $entry.Open()
+                try { $digest = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() }
+                finally { $stream.Dispose() }
+                $digests.Add($relative, $digest)
+            }
+            if (-not $digests.Count) { throw 'Arsiv bos.' }
+            $manifest = New-Object Text.StringBuilder
+            foreach ($item in $digests.GetEnumerator()) {
+                [void]$manifest.Append($item.Key).Append([char]0).Append($item.Value).Append([char]10)
+            }
+            $bytes = [Text.Encoding]::UTF8.GetBytes($manifest.ToString())
+            return [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '').ToLowerInvariant()
+        } finally { $sha.Dispose(); $archive.Dispose() }
+    }
+
+    function Install-OdakUv {
+        param([string]$Archive, [string]$ArchiveHash, [string]$BinaryHash, [string]$Destination)
+        Assert-OdakFileHash $Archive $ArchiveHash
+        $unpacked = Join-Path $workPath 'uv-extracted'
+        Expand-Archive -LiteralPath $Archive -DestinationPath $unpacked
+        $binary = Join-Path $unpacked 'uv.exe'
+        Assert-OdakFileHash $binary $BinaryHash
+        New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
+        Copy-Item -LiteralPath $binary -Destination $Destination
+        Assert-OdakFileHash $Destination $BinaryHash
+    }
+
     function Invoke-OdakCommand {
         param([string]$Executable, [string[]]$Arguments)
         $previousModules = [Environment]::GetEnvironmentVariable('PSModulePath', 'Process')
@@ -44,20 +104,24 @@ param(
     function Get-OdakUv {
         $command = Get-Command uv.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($command) { return $command.Source }
-        $privateUv = Join-Path $env:LOCALAPPDATA 'Programs\Odak-Tools\uv\uv.exe'
-        if (Test-Path -LiteralPath $privateUv -PathType Leaf) { return $privateUv }
-        Write-Host 'uv resmi kaynagindan kuruluyor...'
-        $installer = Join-Path $workPath 'install-uv.ps1'
-        Invoke-WebRequest -UseBasicParsing -Uri 'https://astral.sh/uv/install.ps1' -OutFile $installer
-        $previousUnmanaged = [Environment]::GetEnvironmentVariable('UV_UNMANAGED_INSTALL', 'Process')
-        try {
-            $env:UV_UNMANAGED_INSTALL = Split-Path -Parent $privateUv
-            $powershellPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-            Invoke-OdakCommand $powershellPath @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $installer) | Out-Host
-        } finally {
-            [Environment]::SetEnvironmentVariable('UV_UNMANAGED_INSTALL', $previousUnmanaged, 'Process')
+        $version = '0.13.5'
+        $architecture = $env:PROCESSOR_ARCHITECTURE
+        if ($env:PROCESSOR_ARCHITEW6432) { $architecture = $env:PROCESSOR_ARCHITEW6432 }
+        switch ($architecture) {
+            'AMD64' { $target = 'x86_64'; $zipHash = 'a38b8d1902b7cfbc76b423ba1bb456f623f42064cdc72628b6075b89afd1019a'; $exeHash = 'f45d1cb9d9140ca6d3f4005fdfc0ebeccf849fd04d1dc85804155cb923f1597b' }
+            'ARM64' { $target = 'aarch64'; $zipHash = '09f47edf90726084a70f9426f6e3ca4f46e9bf7cbf23b1716ec64d60b055fae3'; $exeHash = '9690c472d1f5c9c57b5919512c64024dfff872d3e35be8f1892fe895a502b913' }
+            'x86' { $target = 'i686'; $zipHash = '96228420d0a89a64757afba59932c1e58c4977e4122f2cc9f8615a51ba2d3084'; $exeHash = '9171486cedba050e942fbdacf26156a418245c934e7d1723a37000de62f65a21' }
+            default { throw 'Bu islemci mimarisi icin uv paketi tanimli degil.' }
         }
-        if (-not (Test-Path -LiteralPath $privateUv -PathType Leaf)) { throw 'uv kurulumu tamamlanamadi.' }
+        $privateUv = Join-Path $env:LOCALAPPDATA ("Programs\Odak-Tools\uv\$version\$target\uv.exe")
+        if (Test-Path -LiteralPath $privateUv -PathType Leaf) {
+            Assert-OdakFileHash $privateUv $exeHash
+            return $privateUv
+        }
+        Write-Host ('uv ' + $version + ' resmi surum paketinden kuruluyor...')
+        $zipPath = Join-Path $workPath 'uv.zip'
+        Invoke-WebRequest -UseBasicParsing -Uri ("https://github.com/astral-sh/uv/releases/download/$version/uv-$target-pc-windows-msvc.zip") -OutFile $zipPath
+        Install-OdakUv $zipPath $zipHash $exeHash $privateUv
         return $privateUv
     }
 
@@ -90,6 +154,12 @@ param(
     }
 
     try {
+        if (-not $SourceSha256) {
+            if ($SourceArchive -or $Ref -ne '13598e705eb974765e218f9b159c721e53645f24') {
+                throw 'Farkli kaynak icin guvenilir bir -SourceSha256 degeri gerekli.'
+            }
+            $SourceSha256 = '74f010226390c0de4fec866408232b9f5c02f7e262912112f32335b2bed7bee1'
+        }
         $InstallDir = [IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($InstallDir))
         $marker = Join-Path $InstallDir '.odak-install.json'
         if (Test-Path -LiteralPath $marker -PathType Leaf) {
@@ -112,14 +182,20 @@ param(
             $repository = 'https://api.github.com/repos/dogukandincoguz/Odak'
             Write-Host ('Odak indiriliyor: ' + $Ref)
             try {
-                $commit = Invoke-RestMethod -Uri ($repository + '/commits/' + [Uri]::EscapeDataString($Ref)) -Headers $headers
-                $revision = $commit.sha
+                $revision = $Ref
+                if ($revision -notmatch '^[0-9a-f]{40}$') {
+                    $commit = Invoke-RestMethod -Uri ($repository + '/commits/' + [Uri]::EscapeDataString($Ref)) -Headers $headers
+                    $revision = $commit.sha
+                }
                 if ($revision -notmatch '^[0-9a-f]{40}$') { throw 'Gecersiz GitHub yaniti.' }
                 Invoke-WebRequest -UseBasicParsing -Uri ($repository + '/zipball/' + $revision) -Headers $headers -OutFile $zipPath
             } catch {
                 # Never include authenticated redirect URLs or headers in errors.
-                throw 'GitHub indirmesi tamamlanamadi. Interneti, branch adini ve repo erisimini kontrol et. Gizli repo icin -GitHubToken kullan; public repo token gerektirmez.'
+                throw 'GitHub indirmesi tamamlanamadi. Internet baglantisini, surumu ve repo erisimini kontrol et.'
             }
+        }
+        if ((Get-OdakSourceHash $zipPath) -ne $SourceSha256) {
+            throw 'Kaynak SHA-256 dogrulamasi basarisiz. Kurulum ve gorev verileri degistirilmedi.'
         }
         $extractPath = Join-Path $workPath 'source'
         New-Item -ItemType Directory -Path $extractPath | Out-Null
