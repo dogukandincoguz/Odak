@@ -1,6 +1,6 @@
 # Odak
 
-Windows için görev, hatırlatma ve odak sayacı uygulaması. Windows hesabınıza giriş yaptığınızda sağ üstte açılır ve diğer normal pencerelerin üzerinde kalır. Görev çubuğunda görünmez; simgesi sağ alttaki sistem tepsisindedir. Kurulumdan sonra çevrimdışı çalışır ve hesap gerektirmez. Görevler bu bilgisayarda saklanır.
+Windows için görev, hatırlatma ve odak sayacı uygulaması. Windows hesabınıza giriş yaptığınızda sağ üstte açılır ve diğer normal pencerelerin üzerinde kalır. Varsayılan olarak yalnız sistem tepsisinde görünür; üç nokta menüsünden görev çubuğu simgesi de açılabilir. Kurulumdan sonra çevrimdışı çalışır ve hesap gerektirmez. Görevler bu bilgisayarda saklanır.
 
 ## Tek komutla kurulum ve güncelleme
 
@@ -50,9 +50,9 @@ Aynı kuruluma ait veri klasörü kurulum kaydından hatırlanır. Sistemin kal�
 
 ## Otomatik başlatma ve kapatma
 
-Kurulum, Windows hesabınıza girişte Odak'ı başlatan bir kısayol oluşturur. Otomatik başlatmayı kapatmak için `Win+R` → `shell:startup` klasöründeki **Odak** kısayolunu kaldırın. Uygulama ve görev verileri silinmez. Kurulum komutunu yeniden çalıştırmak bu kısayolu tekrar oluşturur; bunu istemiyorsanız `-NoShortcuts` seçeneğini kullanın.
+Kurulum, Windows hesabınıza girişte Odak'ı başlatan bir kısayol oluşturur. Üç nokta menüsündeki **Windows başlangıcı: etkin / devre dışı** satırına tıklayarak otomatik başlatmayı kapatıp açabilirsiniz. Bu işlem kullanılan veri klasörünü korur ve masaüstü kısayolunu değiştirmez. Elle kapatmak için `Win+R` → `shell:startup` klasöründeki **Odak** kısayolu da kaldırılabilir. Kurulum komutunu yeniden çalıştırmak bu kısayolu tekrar oluşturur; bunu istemiyorsanız `-NoShortcuts` seçeneğini kullanın.
 
-Ana penceredeki **eksi** düğmesi uygulamayı sistem tepsisine gizler; hatırlatmalar ve sayaç çalışmaya devam eder. **×** düğmesi uygulamayı tamamen kapatır. Bir sonraki Windows oturumunda otomatik başlatma etkinse yeniden açılır. Daha erken açmak için masaüstü kısayolunu kullanabilirsiniz.
+Üç nokta menüsündeki **Görev çubuğunda göster** seçeneği açılışlar arasında hatırlanır. Açıkken **eksi** düğmesi pencereyi görev çubuğuna küçültür; kapalıyken sistem tepsisine gizler. Hatırlatmalar ve sayaç çalışmaya devam eder. **×** düğmesi uygulamayı tamamen kapatır. Bir sonraki Windows oturumunda otomatik başlatma etkinse yeniden açılır. Daha erken açmak için masaüstü kısayolunu kullanabilirsiniz.
 
 ## Kaynak koddan çalıştırma
 
@@ -87,9 +87,10 @@ Arayüz **PySide6-Essentials (Qt)** ile yazılmıştır; veriler **SQLite** içi
 - Deadline'a **24 saatten az** kalan işler kırmızı, **24–72 saat** kalanlar sarıdır. Daha uzak veya deadline'ı olmayan görevler normal renktedir.
 - Süresi dolan işler **Geçenler → Deadline’ı geçenler** bölümüne otomatik taşınır.
 - Tik simgesi görevi tamamlar; tamamlananlar **Bitenler** bölümünden yeniden açılabilir.
+- Kartın solundaki altı noktalı tutamağı sürükleyerek görevleri yukarı veya aşağı taşıyabilirsiniz. Her listenin sırası ayrı kaydedilir; **Bugün** sırası diğer listelerden bağımsızdır. İlk elle sıralamadan sonra yeni gelen görevler o listenin sonuna eklenir. Arama sırasında tutamaklar gizlenir; temizleyince geri gelir. Tutamak odaktayken yukarı/aşağı okları da sıralamayı değiştirir.
 - Silinen işler **Silinenler → Son silinenler** alanından **10 dakika** boyunca geri alınabilir. Süre uygulama kapalıyken de ilerler; süresi dolan kayıtlar uygulama çalışırken kalıcı olarak temizlenir.
 - Kalem simgesi başlığı, notu, deadline'ı ve alt adımları düzenler. **Görevler** bölümünde **Ctrl+F** arama alanına geçer; arama seçili listedeki başlık ve notları tarar.
-- Eksi düğmesi pencereyi sistem tepsisine gizler. Sağ alttaki tepsi simgesine tıklayarak veya sağ tık → **Odak’ı göster** ile pencereyi geri açabilirsiniz. Üç nokta menüsünden sağ üste yeniden yerleştirilebilir.
+- Sağ alttaki tepsi simgesine tıklayarak veya sağ tık → **Odak’ı göster** ile pencereyi geri açabilirsiniz. Üç nokta menüsünden sağ üste yeniden yerleştirilebilir.
 - Pencereyi üstteki logo veya başlık alanından sol tıkla tutup sürükleyerek taşıyabilirsiniz. Konum kaydedilmez; her yeni açılışta yine sağ üst köşede başlar.
 - Kenarlardan veya sağ alt köşedeki tutamaktan pencereyi boyutlandırabilirsiniz. Boyut kaydedilir; sonraki açılışta bu boyutla sağ üstte açılır. Yeni görev, hatırlatma ve şablon pencereleri kendi üst barlarından taşınır; üstteki kutusuz `×` formu kapatır.
 - Uygulama birlikte gelen **Inter** yazı tipini kullanır; ayrıca font kurulumu gerekmez. Yazı tipi [SIL Open Font License 1.1](assets/fonts/OFL.txt) lisansıyla dağıtılır.
@@ -138,7 +139,7 @@ Sayaç tepsiye gizlendiğinde çalışır ve açılışlar arasında durumunu ko
 
 Üç nokta menüsünden:
 
-- **Dışa aktar:** görevleri, adımları, günlük sıralamayı, hatırlatma kurallarını ve şablonları taşınabilir JSON dosyasına kaydeder. Pencere ve sayaç ayarları JSON'a dahil edilmez.
+- **Dışa aktar:** görevleri, adımları, liste sıralarını, hatırlatma kurallarını ve şablonları taşınabilir JSON dosyasına kaydeder. Pencere ve sayaç ayarları JSON'a dahil edilmez.
 - **İçe aktar:** JSON'daki yeni kayıtları ekler. Aynı kimlikli mevcut kayıtları değiştirmez.
 - **Şimdi yedek al:** veritabanının güvenli anlık kopyasını alır.
 - **Yedekten geri yükle:** mevcut verileri seçilen yedekle değiştirir; işlem öncesi mevcut durumun yedeği alınır.

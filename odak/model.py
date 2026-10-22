@@ -12,6 +12,7 @@ from pathlib import Path
 from .recurrence import next_scheduled, meeting_link, LEADS
 
 UNDO_SECONDS = 10 * 60
+ORDERED_LISTS = ("active", "overdue", "someday", "done", "trash")
 
 
 @dataclass(frozen=True)
@@ -137,6 +138,11 @@ class Store:
                 created_at REAL NOT NULL
             );
             CREATE INDEX IF NOT EXISTS tasks_deleted ON tasks(deleted_at);
+            CREATE TABLE IF NOT EXISTS task_order (
+                scope TEXT NOT NULL, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                position INTEGER NOT NULL CHECK(position>=0), PRIMARY KEY(scope, task_id)
+            );
+            CREATE INDEX IF NOT EXISTS task_order_task ON task_order(task_id);
             CREATE TABLE IF NOT EXISTS steps (
                 id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
                 title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL
@@ -248,6 +254,29 @@ class Store:
             raise ValueError("Bugün listesi değişti; sıralamayı yeniden dene.")
         with self.db:
             self.db.executemany("UPDATE tasks SET today_position=? WHERE id=?", enumerate(identities))
+
+    def task_positions(self, scope: str) -> dict[str, int]:
+        return {row["task_id"]: row["position"] for row in self.db.execute(
+            "SELECT task_id,position FROM task_order WHERE scope=?", (scope,))}
+
+    def reorder_tasks(self, scope: str, identities: list[str]):
+        if scope == "today":
+            return self.reorder_today(identities)
+        if scope not in ORDERED_LISTS:
+            raise ValueError("Geçersiz görev listesi.")
+        selected = set()
+        now = datetime.now()
+        for task in self.all(now.timestamp()):
+            kind = category(task, now)
+            task_scope = kind if kind in ("overdue", "done", "trash", "someday") else "active"
+            if task_scope == scope:
+                selected.add(task.id)
+        if len(identities) != len(set(identities)) or set(identities) != selected:
+            raise ValueError("Görev listesi değişti; sıralamayı yeniden dene.")
+        with self.db:
+            self.db.execute("DELETE FROM task_order WHERE scope=?", (scope,))
+            self.db.executemany("INSERT INTO task_order(scope,task_id,position) VALUES (?,?,?)",
+                                ((scope, identity, position) for position, identity in enumerate(identities)))
 
     def templates(self) -> list[Template]:
         return [Template(r["id"], r["name"], r["title"], r["notes"], tuple(json.loads(r["steps"])))

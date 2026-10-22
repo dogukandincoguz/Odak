@@ -19,6 +19,7 @@ from .schedule import suggest_date
 from .controls import ChoiceBox, TimeField, field_style
 from .windows import StyledDialog, DragHeader, FileDialog, Foldout, WINDOW_STYLE, make_resize_handles, position_resize_handles
 from .ordering import TaskDropArea, TaskGrip
+from .startup import Startup
 
 COLORS = {"neutral": "#9a8bff", "urgent": "#ff828e", "soon": "#efc575",
           "overdue": "#ff828e", "done": "#80d3b5", "trash": "#9cacc2", "someday": "#9cacc2"}
@@ -27,6 +28,13 @@ COLORS = {"neutral": "#9a8bff", "urgent": "#ff828e", "soon": "#efc575",
 def search_key(text: str) -> str:
     # Türkçe İ/i ve I/ı aramaları klavye düzeninden bağımsız eşleşsin.
     return text.casefold().replace("\u0307", "").replace("ı", "i")
+
+
+def main_window_flags(taskbar_visible: bool):
+    flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
+    if taskbar_visible:
+        return flags | Qt.WindowType.Window | Qt.WindowType.WindowSystemMenuHint | Qt.WindowType.WindowMinimizeButtonHint
+    return flags | Qt.WindowType.Tool
 
 STYLE = """
 QWidget { color: #e8edf7; font-family: 'Inter'; font-size: 13px; }
@@ -462,7 +470,7 @@ class TaskCard(QFrame):
         body.setSpacing(9)
         top = QHBoxLayout()
         top.setSpacing(10)
-        if owner.current_tab == "today" and not owner.search.text().strip():
+        if not owner.search.text().strip():
             top.addWidget(TaskGrip(owner, task.id, self), 0, Qt.AlignmentFlag.AlignTop)
         if self.kind != "trash":
             top.addWidget(tool("check" if self.kind == "done" else "circle",
@@ -551,6 +559,7 @@ class MainWindow(QWidget):
         self.current_view = "tasks"
         self.expanded_steps = set()
         self.backups = Backups(store)
+        self.startup = Startup(project, store.path.parent)
         self._cached_tasks = []
         self._cache_revision = -1
         self._backup_check = 0.0
@@ -559,7 +568,10 @@ class MainWindow(QWidget):
         self.snapshot = None
         self.notice_until = 0.0
         self._task_dragging = False
+        self._drag_tab = None
         self._today_order = []
+        self._list_order = []
+        self.taskbar_visible = self.store.setting("taskbar_visible", False) is True
         self._size_ready = False
         self._anchoring = False
         self._preferred_size = self.store.setting("window_size", [460, 840])
@@ -572,8 +584,7 @@ class MainWindow(QWidget):
         self._resize_handles = []
         self.setWindowTitle("Odak · Görevlerin")
         self.setWindowIcon(app_icon())
-        self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint |
-                            Qt.WindowType.WindowStaysOnTopHint)
+        self.setWindowFlags(main_window_flags(self.taskbar_visible))
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -600,7 +611,8 @@ class MainWindow(QWidget):
         header.addLayout(title_col, 1)
         self.menu_button = tool("menu", "Seçenekler", self.show_menu)
         header.addWidget(self.menu_button, 0, Qt.AlignmentFlag.AlignTop)
-        header.addWidget(tool("minus", "Sistem tepsisine gizle", self.hide_to_tray), 0, Qt.AlignmentFlag.AlignTop)
+        self.minimize_button = tool("minus", "Görev çubuğuna küçült" if self.taskbar_visible else "Sistem tepsisine gizle", self.hide_to_tray)
+        header.addWidget(self.minimize_button, 0, Qt.AlignmentFlag.AlignTop)
         close = tool("close", "Uygulamayı kapat", self.close)
         close.setObjectName("closeApp")
         header.addWidget(close, 0, Qt.AlignmentFlag.AlignTop)
@@ -734,6 +746,7 @@ class MainWindow(QWidget):
         self.set_tab("active")
         self.set_view("tasks")
         self._resize_handles = make_resize_handles(self)
+        position_resize_handles(self, self._resize_handles)
         self.anchor()
         self._size_ready = True
 
@@ -764,7 +777,7 @@ class MainWindow(QWidget):
         self.move(rect.right() - width - 15, rect.top() + 16)
         self._anchoring = False
 
-    def show_menu(self):
+    def create_menu(self):
         menu = QMenu(self)
         menu.addAction("Sağ üste yerleştir", self.anchor)
         menu.addAction("Yeni görev\tCtrl+N", lambda: self.edit_task())
@@ -776,12 +789,60 @@ class MainWindow(QWidget):
         menu.addAction("Şimdi yedek al", self.manual_backup)
         menu.addAction("Yedekten geri yükle…", self.restore_backup)
         menu.addSeparator()
-        startup = Path.home() / "AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/Odak.lnk"
-        status = menu.addAction("Windows başlangıcı: " + ("etkin" if startup.exists() else "kurulu değil"))
-        status.setEnabled(False)
+        try:
+            enabled = self.startup.enabled()
+            startup = menu.addAction("Windows başlangıcı: " + ("etkin" if enabled else "devre dışı"))
+            startup.setCheckable(True)
+            startup.setChecked(enabled)
+            startup.triggered.connect(self.set_startup_enabled)
+        except OSError:
+            startup = menu.addAction("Windows başlangıcı kullanılamıyor")
+            startup.setEnabled(False)
+        taskbar = menu.addAction("Görev çubuğunda göster")
+        taskbar.setCheckable(True)
+        taskbar.setChecked(self.taskbar_visible)
+        taskbar.triggered.connect(self.set_taskbar_visible)
         menu.addSeparator()
         menu.addAction("Uygulamayı kapat", self.close)
-        menu.exec(self.menu_button.mapToGlobal(self.menu_button.rect().bottomLeft()))
+        return menu
+
+    def show_menu(self):
+        menu = self.create_menu()
+        try:
+            menu.exec(self.menu_button.mapToGlobal(self.menu_button.rect().bottomLeft()))
+        finally:
+            menu.deleteLater()
+
+    def set_startup_enabled(self, enabled):
+        try:
+            self.startup.set_enabled(enabled)
+        except OSError as exc:
+            self.report_error(exc)
+            return
+        self.notify("Windows başlangıcı etkinleştirildi." if enabled else "Windows başlangıcı devre dışı bırakıldı.")
+
+    def set_taskbar_visible(self, visible, persist=True):
+        visible = bool(visible)
+        if persist:
+            try:
+                self.store.set_setting("taskbar_visible", visible)
+            except Exception as exc:
+                self.report_error(exc)
+                return
+        if visible != self.taskbar_visible:
+            geometry, was_visible = self.geometry(), self.isVisible()
+            self.taskbar_visible = visible
+            self.hide()
+            self.setWindowFlags(main_window_flags(visible))
+            self.setGeometry(geometry)
+            if was_visible:
+                self.show()
+                self.raise_()
+                self.activateWindow()
+        caption = "Görev çubuğuna küçült" if visible else "Sistem tepsisine gizle"
+        self.minimize_button.setToolTip(caption)
+        self.minimize_button.setAccessibleName(caption)
+        self.notify("Görev çubuğu simgesi açık." if visible else "Yalnız sistem tepsisinde gösteriliyor.")
 
     def manage_templates(self):
         from .templates import TemplateManager
@@ -790,13 +851,17 @@ class MainWindow(QWidget):
         dialog.deleteLater()
 
     def move_today(self, identity, target, after=False):
-        order = self._today_order.copy()
+        if self.current_tab == "today":
+            self.move_task(identity, target, after)
+
+    def move_task(self, identity, target, after=False):
+        order = self._list_order.copy()
         if identity == target or identity not in order or target not in order:
             return
         order.remove(identity)
         index = order.index(target) + int(after)
         order.insert(index, identity)
-        self.perform(lambda: self.store.reorder_today(order), "Bugünkü sıralaman kaydedildi.")
+        self.perform(lambda: self.store.reorder_tasks(self.current_tab, order), "Liste sıralaman kaydedildi.")
 
     def set_view(self, view: str):
         self.current_view = view
@@ -915,6 +980,15 @@ class MainWindow(QWidget):
             shown.sort(key=lambda t: t.deleted_at, reverse=True)
         elif self.current_tab == "done":
             shown.sort(key=lambda t: t.completed_at, reverse=True)
+        if self.current_tab != "today":
+            positions = self.store.task_positions(self.current_tab)
+            shown.sort(key=lambda task: (task.id not in positions, positions.get(task.id, 0)))
+            manual = any(task.id in positions for task in shown)
+            defaults = {"active": "Deadline’ı yakın olanlar en üstte.", "overdue": "Süresi geçen görevlerini buradan yönetebilirsin.",
+                        "someday": "Hazır olduğunda görev seçeneklerinden aktif listeye taşı.",
+                        "done": "İlerleme burada birikir. Eline sağlık.", "trash": "Her görevi silindikten sonra 10 dakika içinde geri alabilirsin."}
+            self.section_hint.setText("Tutamaktan sürükleyerek sırala. Yeni görevler listenin sonuna eklenir." if manual else defaults[self.current_tab])
+        self._list_order = [task.id for task in shown]
         query = search_key(self.search.text().strip())
         if query:
             shown = [t for t in shown if query in search_key(t.title + " " + t.notes)]
@@ -1031,7 +1105,9 @@ class MainWindow(QWidget):
         self.perform(restore, "Görev önceki durumuyla geri alındı.")
 
     def hide_to_tray(self):
-        if self.tray is not None and self.tray.isVisible():
+        if self.taskbar_visible:
+            self.showMinimized()
+        elif self.tray is not None and self.tray.isVisible():
             self.hide()
         else:
             self.showMinimized()
@@ -1066,6 +1142,7 @@ class MainWindow(QWidget):
             self._cache_revision = -1
             self.last_reminder = None
             self.focus_panel.reload_preferences()
+            self.set_taskbar_visible(self.store.setting("taskbar_visible", False) is True, persist=False)
         self.perform(restore, "Yedek geri yüklendi.")
         self.reminder_panel.refresh(force=True)
 

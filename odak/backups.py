@@ -10,7 +10,7 @@ from contextlib import closing
 from datetime import date, datetime
 from pathlib import Path
 
-from .model import Store
+from .model import Store, ORDERED_LISTS
 from .recurrence import validate_rule, meeting_link, LEADS
 
 
@@ -60,6 +60,7 @@ def export_json(store: Store, target: Path):
             "exported_at": datetime.now().isoformat(),
             "tasks": [dict(r) for r in store.db.execute("SELECT * FROM tasks")],
             "steps": [dict(r) for r in store.db.execute("SELECT * FROM steps ORDER BY position")],
+            "task_order": [dict(r) for r in store.db.execute("SELECT * FROM task_order ORDER BY scope,position")],
             "reminders": [dict(r) for r in store.db.execute("SELECT * FROM reminders")],
             "templates": [dict(r) for r in store.db.execute("SELECT * FROM templates")]}
     contents = json.dumps(data, ensure_ascii=False, indent=2)
@@ -84,6 +85,9 @@ def import_json(store: Store, source: Path) -> int:
     tasks, steps, reminders, templates = (data.get(k, []) for k in ("tasks", "steps", "reminders", "templates"))
     if not all(isinstance(items, list) for items in (tasks, steps, reminders, templates)):
         raise ValueError("Dosya yapısı geçersiz.")
+    task_order = data.get("task_order", [])
+    if not isinstance(task_order, list):
+        raise ValueError("Görev sırası geçersiz.")
 
     def identity(value):
         if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{32}", value):
@@ -123,6 +127,16 @@ def import_json(store: Store, source: Path) -> int:
         identity(step.get("id")); identity(step.get("task_id")); text(step.get("title"), True)
         if step["task_id"] not in seen or type(step.get("position")) is not int:
             raise ValueError("Alt adımın görevi veya sırası geçersiz.")
+    order_ids, order_positions = set(), set()
+    for item in task_order:
+        if not isinstance(item, dict) or item.get("scope") not in ORDERED_LISTS:
+            raise ValueError("Görev sırası geçersiz.")
+        identity(item.get("task_id"))
+        scope, task_id, position = item["scope"], item["task_id"], item.get("position")
+        if (task_id not in seen or type(position) is not int or position < 0
+                or (scope, task_id) in order_ids or (scope, position) in order_positions):
+            raise ValueError("Görev sırası geçersiz.")
+        order_ids.add((scope, task_id)); order_positions.add((scope, position))
     reminder_ids = set()
     for reminder in reminders:
         identity(reminder.get("id")); text(reminder.get("title"), True); text(reminder.get("notes", ""))
@@ -171,6 +185,13 @@ def import_json(store: Store, source: Path) -> int:
             if step["task_id"] in added:
                 store.db.execute("INSERT INTO steps VALUES (?,?,?,?,?)",
                     (step["id"], step["task_id"], step["title"], int(bool(step.get("done"))), step["position"]))
+        for scope in ORDERED_LISTS:
+            incoming = sorted((item for item in task_order if item["scope"] == scope and item["task_id"] in added),
+                              key=lambda item: item["position"])
+            offset = store.db.execute("SELECT COALESCE(MAX(position),-1)+1 FROM task_order WHERE scope=?", (scope,)).fetchone()[0]
+            for position, item in enumerate(incoming, offset):
+                store.db.execute("INSERT INTO task_order(scope,task_id,position) VALUES (?,?,?)",
+                                 (scope, item["task_id"], position))
         for r in reminders:
             cursor = store.db.execute("INSERT OR IGNORE INTO reminders (id,title,notes,weekdays,clock,paused,next_at,snooze_at,deleted_at,created_at,kind,interval,anchor_date,month_day,ordinal,month_weekday,lead_minutes,link,notified_for,expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (r["id"], r["title"], r.get("notes", ""), r["weekdays"], r["clock"], int(bool(r.get("paused"))),

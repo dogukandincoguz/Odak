@@ -181,9 +181,11 @@ class ResizeHandle(QWidget):
     def paintEvent(self, event):
         if self.edges == (Qt.Edge.BottomEdge | Qt.Edge.RightEdge):
             p = QPainter(self)
-            p.setPen(QPen(QColor("#51607b"), 1.3))
-            for offset in (6, 10, 14):
-                p.drawLine(self.width()-offset, self.height()-6, self.width()-6, self.height()-offset)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            p.setPen(QPen(QColor("#51607b"), 1.3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            right, bottom = self.width()-10, self.height()-10
+            for length in (4, 8, 12):
+                p.drawLine(right-length, bottom, right, bottom-length)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:

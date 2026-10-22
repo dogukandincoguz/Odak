@@ -1,9 +1,9 @@
-"""Bugün listesindeki kartlar için tutamak ve bırakma göstergesi."""
+"""Görev listelerindeki kartlar için tutamak ve bırakma göstergesi."""
 from PySide6.QtCore import QMimeData, QPoint, QRectF, Qt
 from PySide6.QtGui import QColor, QDrag, QPainter, QPen
 from PySide6.QtWidgets import QApplication, QToolButton, QWidget
 
-MIME = "application/x-odak-today-task"
+MIME = "application/x-odak-task"
 
 
 class TaskGrip(QToolButton):
@@ -29,11 +29,13 @@ class TaskGrip(QToolButton):
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
-            order = self.owner._today_order
+            order = self.owner._list_order
+            if self.task_id not in order:
+                return
             index = order.index(self.task_id)
             next_index = index + (-1 if event.key() == Qt.Key.Key_Up else 1)
             if 0 <= next_index < len(order):
-                self.owner.move_today(self.task_id, order[next_index], next_index > index)
+                self.owner.move_task(self.task_id, order[next_index], next_index > index)
             event.accept()
             return
         super().keyPressEvent(event)
@@ -53,10 +55,12 @@ class TaskGrip(QToolButton):
             drag.setPixmap(self.card.grab().scaledToWidth(300, Qt.TransformationMode.SmoothTransformation))
             drag.setHotSpot(QPoint(12, 12))
             self.owner._task_dragging = True
+            self.owner._drag_tab = self.owner.current_tab
             try:
                 drag.exec(Qt.DropAction.MoveAction)
             finally:
                 self.owner._task_dragging = False
+                self.owner._drag_tab = None
                 self.owner.list_widget.clear_indicator()
                 self.owner.refresh(force=True)
             return
@@ -76,7 +80,8 @@ class TaskDropArea(QWidget):
     def eligible(self, event):
         source = event.source()
         return (isinstance(source, TaskGrip) and source.owner is self.owner and event.mimeData().hasFormat(MIME)
-                and self.owner.current_tab == "today" and not self.owner.search.text().strip())
+                and self.owner.current_view == "tasks" and self.owner.current_tab == self.owner._drag_tab
+                and not self.owner.search.text().strip())
 
     def dragEnterEvent(self, event):
         if self.eligible(event):
@@ -117,7 +122,7 @@ class TaskDropArea(QWidget):
             target = self.target(event.position().y())
             if target:
                 identity = bytes(event.mimeData().data(MIME)).decode("ascii")
-                self.owner.move_today(identity, target[0], target[1])
+                self.owner.move_task(identity, target[0], target[1])
             event.acceptProposedAction()
         self.clear_indicator()
 
