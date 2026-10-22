@@ -201,6 +201,108 @@ class UiTests(unittest.TestCase):
         self.window.show_more()
         self.assertEqual(len(self.window.cards), 125)
 
+    def test_template_applies_fields_without_copying_deadline(self):
+        identity = self.store.save_template("Sunum", "Hazırlık", "not", ["Veriler", "Prova"])
+        dialog = TaskDialog(self.window)
+        dialog.use_date.setChecked(True)
+        deadline = dialog.values()["deadline"]
+        dialog.template_choice.setCurrentIndex(dialog.template_choice.findData(identity))
+        values = dialog.values()
+        self.assertEqual((values["title"],values["notes"],values["steps"]),("Hazırlık","not",["Veriler","Prova"]))
+        self.assertEqual(values["deadline"],deadline)
+        self.assertEqual(self.store.all(),[])
+        self.assertTrue(dialog.steps_fold.toggle.isChecked())
+        dialog.deleteLater()
+
+    def test_new_forms_have_custom_topmost_headers_and_close_without_saving(self):
+        from odak.panels import ReminderDialog
+        for dialog in (TaskDialog(self.window), ReminderDialog(self.window)):
+            dialog.show()
+            self.app.processEvents()
+            self.assertTrue(dialog.windowFlags() & Qt.WindowType.FramelessWindowHint)
+            self.assertTrue(dialog.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+            self.assertEqual(dialog.windowFlags() & Qt.WindowType.WindowType_Mask,Qt.WindowType.Tool)
+            dialog.title.setText("Kaydedilmeyecek")
+            QTest.mouseClick(dialog.close_button,Qt.MouseButton.LeftButton)
+            self.assertEqual(dialog.result(),QDialog.DialogCode.Rejected)
+            self.assertFalse(dialog.isVisible())
+            dialog.deleteLater()
+        self.assertEqual(self.store.all(),[])
+        self.assertEqual(self.store.reminders(),[])
+
+    def test_reminder_once_and_monthly_form_and_invalid_link(self):
+        from odak.panels import ReminderDialog
+        from PySide6.QtCore import QDate
+        dialog = ReminderDialog(self.window)
+        dialog.show()
+        dialog.title.setText("Bir kez ara")
+        dialog.kind.setCurrentIndex(dialog.kind.findData("once"))
+        self.assertFalse(dialog.weekly_box.isVisible())
+        self.assertFalse(dialog.interval_box.isVisible())
+        dialog.date.setDate(QDate.currentDate().addDays(1))
+        dialog.link.setText("file:///C:/secret")
+        dialog.submit()
+        self.assertTrue(dialog.error.isVisible())
+        self.assertNotEqual(dialog.result(),QDialog.DialogCode.Accepted)
+        dialog.link.setText("https://example.com/meet")
+        dialog.lead.setCurrentIndex(dialog.lead.findData(10))
+        identity = self.store.save_reminder(**dialog.values())
+        reminder = self.store.reminders()[0]
+        self.assertEqual((reminder.id,reminder.kind,reminder.lead_minutes),(identity,"once",10))
+        dialog.kind.setCurrentIndex(dialog.kind.findData("monthly_weekday"))
+        self.assertTrue(dialog.ordinal_box.isVisible())
+        self.assertFalse(dialog.weekly_box.isVisible())
+        self.assertFalse(dialog.month_day.isVisible())
+        self.assertEqual(self.store.all(),[])
+        dialog.hide()
+        dialog.deleteLater()
+
+    def test_today_grip_moves_task_and_filter_disables_drag(self):
+        from odak.ordering import TaskGrip
+        a = self.store.save("A",today=True)
+        b = self.store.save("B",today=True)
+        c = self.store.save("C",today=True)
+        self.window.set_tab("today")
+        self.assertEqual([card.task.id for card in self.window.cards],[a,b,c])
+        grip = self.window.cards[0].findChild(TaskGrip)
+        QTest.keyClick(grip,Qt.Key.Key_Down)
+        self.assertEqual([card.task.id for card in self.window.cards],[b,a,c])
+        self.window.move_today(c,b)
+        self.assertEqual([card.task.id for card in self.window.cards],[c,b,a])
+        self.window.search.setText("A")
+        self.assertIsNone(self.window.cards[0].findChild(TaskGrip))
+        self.window.search.clear()
+        self.assertEqual([card.task.id for card in self.window.cards],[c,b,a])
+
+    def test_size_is_remembered_but_position_starts_at_top_right(self):
+        self.window.resize(510,720)
+        self.window.move(20,50)
+        self.app.processEvents()
+        self.window.save_size()
+        second = MainWindow(self.store,Path(__file__).resolve().parents[1],with_tray=False)
+        second.timer.stop()
+        second.show()
+        self.app.processEvents()
+        rect = second.screen().availableGeometry()
+        self.assertEqual((second.width(),second.height()),(510,720))
+        self.assertEqual(second.y(),rect.top()+16)
+        self.assertEqual(second.geometry().right(),rect.right()-16)
+        self.assertEqual(len(second._resize_handles),8)
+        second.hide()
+        second.deleteLater()
+
+    def test_meeting_button_opens_saved_http_link_and_once_has_no_repeat_buttons(self):
+        from unittest.mock import patch
+        moment = datetime.now()+timedelta(days=1)
+        self.store.save_reminder("Tek toplantı","",[],"14:00",kind="once",anchor_date=moment.date(),link="https://example.com/meet")
+        card = self.window.reminder_panel.card(self.store.reminders()[0])
+        buttons = card.findChildren(QPushButton)
+        self.assertFalse(any(b.text() in ("Duraklat","Bu tekrarı atla","Tamamlandı") for b in buttons))
+        with patch("odak.panels.QDesktopServices.openUrl") as open_url:
+            next(b for b in buttons if b.text().startswith("Toplantıyı aç")).click()
+            self.assertEqual(open_url.call_args.args[0].toString(),"https://example.com/meet")
+        card.deleteLater()
+
 
 if __name__ == "__main__":
     unittest.main()

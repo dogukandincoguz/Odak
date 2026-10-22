@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import math
 import time
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
-from PySide6.QtCore import QLocale, QDate, Qt, QTime
-from PySide6.QtWidgets import (QDialog, QFrame, QGridLayout,
+from PySide6.QtCore import QLocale, QDate, Qt, QTime, QUrl
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import (QDateEdit, QDialog, QFrame, QGridLayout,
     QHBoxLayout, QLabel, QLayout, QLineEdit, QPushButton, QScrollArea, QSizePolicy, QTextEdit,
     QVBoxLayout, QWidget)
 
@@ -13,33 +14,45 @@ from .model import Reminder, UNDO_SECONDS, category
 from .schedule import DAYS, DAY_SHORTS
 from .ui import CountTab, app_icon, icon, label, tool
 from .controls import ChoiceBox, Stepper, TimeField
+from .windows import StyledDialog, Foldout
+from .recurrence import next_scheduled, meeting_link, rule_label
 
 
-class ReminderDialog(QDialog):
+class ReminderDialog(StyledDialog):
     def __init__(self, owner, reminder: Reminder | None = None):
-        super().__init__(owner, Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
-        self.setWindowTitle("Hatırlatmayı düzenle" if reminder else "Yeni düzenli hatırlatma")
+        super().__init__(owner, "Hatırlatmayı düzenle" if reminder else "Yeni hatırlatma", 470, 790)
+        self.reminder = reminder
         self.setWindowIcon(app_icon())
-        self.setMinimumWidth(400)
-        self.resize(420, min(660, self.screen().availableGeometry().height() - 64))
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(13)
-        layout.addWidget(label("DÜZENLİ HATIRLATMA", "eyebrow"))
-        layout.addWidget(label("Takvimin seni hatırlasın.", "section"))
+        self.body.addWidget(label("Bir kez ya da düzenli. Zamanı gelince haber verelim.", "muted", True))
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        fields = QWidget()
+        layout = QVBoxLayout(fields)
+        layout.setContentsMargins(0, 0, 7, 0)
+        layout.setSpacing(12)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        scroll.setWidget(fields)
+        self.body.addWidget(scroll, 1)
+        layout.addWidget(label("Hatırlatma başlığı", "muted"))
         self.title = QLineEdit(reminder.title if reminder else "")
+        self.title.setObjectName("taskTitle")
         self.title.setMaxLength(180)
-        self.title.setPlaceholderText("Örneğin: Haftalık toplantı")
+        self.title.setPlaceholderText("Örneğin: Ekip toplantısı")
         self.title.setAccessibleName("Hatırlatma başlığı")
         layout.addWidget(self.title)
-        self.notes = QTextEdit()
-        self.notes.setAcceptRichText(False)
-        self.notes.setFixedHeight(74)
-        self.notes.setPlaceholderText("İsteğe bağlı not")
-        self.notes.setAccessibleName("Hatırlatma notu")
-        self.notes.setPlainText(reminder.notes if reminder else "")
-        layout.addWidget(self.notes)
-        layout.addWidget(label("Hangi günler?", "muted"))
+        layout.addWidget(label("Tekrar", "muted"))
+        self.kind = ChoiceBox()
+        self.kind.setAccessibleName("Hatırlatma tekrar türü")
+        for caption, value in (("Haftalık", "weekly"),("Bir kez", "once"),("Aylık · belirli gün", "monthly_day"),("Aylık · haftanın belirli günü", "monthly_weekday")):
+            self.kind.addItem(caption, value)
+        self.kind.setCurrentIndex(self.kind.findData(reminder.kind if reminder else "weekly"))
+        layout.addWidget(self.kind)
+        self.weekly_box = QWidget()
+        weekly = QVBoxLayout(self.weekly_box)
+        weekly.setContentsMargins(0, 0, 0, 0)
+        weekly.setSpacing(8)
+        weekly.addWidget(label("Hangi günler?", "muted"))
         days = QHBoxLayout()
         days.setSpacing(3)
         self.days = []
@@ -48,50 +61,145 @@ class ReminderDialog(QDialog):
             button.setObjectName("tab")
             button.setAccessibleName(DAYS[index])
             button.setCheckable(True)
-            button.setChecked(index in reminder.weekdays if reminder else index == datetime.now().weekday())
+            button.setChecked(index in reminder.weekdays if reminder and reminder.weekdays else index == datetime.now().weekday())
             button.toggled.connect(self.validate)
             days.addWidget(button, 1)
             self.days.append(button)
-        layout.addLayout(days)
+        weekly.addLayout(days)
         presets = QHBoxLayout()
-        for text, selected in (("Her gün", range(7)), ("Hafta içi", range(5))):
-            button = QPushButton(text)
+        for caption, selected in (("Her gün", range(7)), ("Hafta içi", range(5))):
+            button = QPushButton(caption)
             button.clicked.connect(lambda checked=False, values=selected: self.select_days(values))
             presets.addWidget(button)
-        layout.addLayout(presets)
-        layout.addWidget(label("Hatırlatma saati", "muted"))
+        weekly.addLayout(presets)
+        layout.addWidget(self.weekly_box)
+        self.interval_box = QWidget()
+        interval_layout = QVBoxLayout(self.interval_box)
+        interval_layout.setContentsMargins(0, 0, 0, 0)
+        interval_layout.addWidget(label("Tekrar aralığı", "muted"))
+        self.interval = Stepper()
+        self.interval.setRange(1, 52)
+        self.interval.setValue(reminder.interval if reminder else 1)
+        self.interval.setAccessibleName("Tekrar aralığı")
+        interval_layout.addWidget(self.interval)
+        layout.addWidget(self.interval_box)
+        self.month_day = ChoiceBox()
+        self.month_day.setAccessibleName("Ayın günü")
+        for number in range(1, 32):
+            self.month_day.addItem(f"Ayın {number}. günü", number)
+        self.month_day.addItem("Ayın son günü", 0)
+        self.month_day.setCurrentIndex(self.month_day.findData(reminder.month_day if reminder else date.today().day))
+        layout.addWidget(self.month_day)
+        self.month_hint = label("Seçilen günün olmadığı aylar atlanır. Her ay için ‘son gün’ seçebilirsin.", "muted", True)
+        layout.addWidget(self.month_hint)
+        self.ordinal_box = QWidget()
+        monthly = QHBoxLayout(self.ordinal_box)
+        monthly.setContentsMargins(0, 0, 0, 0)
+        self.ordinal = ChoiceBox()
+        self.ordinal.setAccessibleName("Ay içindeki hafta")
+        for caption, value in (("İlk",1),("İkinci",2),("Üçüncü",3),("Dördüncü",4),("Son",-1)):
+            self.ordinal.addItem(caption, value)
+        self.ordinal.setCurrentIndex(self.ordinal.findData(reminder.ordinal if reminder else -1))
+        self.month_weekday = ChoiceBox()
+        self.month_weekday.setAccessibleName("Ay içindeki tekrar günü")
+        for i, caption in enumerate(DAYS):
+            self.month_weekday.addItem(caption, i)
+        self.month_weekday.setCurrentIndex(reminder.month_weekday if reminder else date.today().weekday())
+        monthly.addWidget(self.ordinal, 2)
+        monthly.addWidget(self.month_weekday, 3)
+        layout.addWidget(self.ordinal_box)
+        self.date_label = label("Başlangıç tarihi", "muted")
+        layout.addWidget(self.date_label)
+        self.date = QDateEdit()
+        self.date.setCalendarPopup(True)
+        self.date.setLocale(QLocale("tr_TR"))
+        self.date.setDisplayFormat("dd MMM yyyy")
+        self.date.setAccessibleName("Hatırlatma tarihi")
+        self.date.setDate(QDate(reminder.anchor_date if reminder else date.today()))
+        layout.addWidget(self.date)
+        time_row = QHBoxLayout()
+        clock_column = QVBoxLayout()
+        clock_column.addWidget(label("Etkinlik saati", "muted"))
         self.clock = TimeField()
         self.clock.setDisplayFormat("HH:mm")
         self.clock.setTime(QTime.fromString(reminder.clock, "HH:mm") if reminder else QTime(9, 0))
         self.clock.setAccessibleName("Hatırlatma saati")
-        layout.addWidget(self.clock)
-        layout.addWidget(label("Seçilen günlerde Windows bildirimi alırsın. Her tekrar aynı kayıt üzerinde ilerler.", "muted", True))
-        actions = QHBoxLayout()
-        cancel = QPushButton("Vazgeç")
-        cancel.clicked.connect(self.reject)
-        self.save_button = QPushButton("Kaydet" if reminder else "Hatırlatmayı ekle")
-        self.save_button.setObjectName("primary")
-        self.save_button.clicked.connect(self.accept)
-        self.save_button.setDefault(True)
-        actions.addWidget(cancel)
-        actions.addWidget(self.save_button, 1)
-        layout.addLayout(actions)
+        clock_column.addWidget(self.clock)
+        lead_column = QVBoxLayout()
+        lead_column.addWidget(label("Bildirim", "muted"))
+        self.lead = ChoiceBox()
+        self.lead.setAccessibleName("Önceden bildirim zamanı")
+        for number in (0, 5, 10, 30):
+            self.lead.addItem("Tam saatinde" if number == 0 else f"{number} dk önce", number)
+        self.lead.setCurrentIndex(self.lead.findData(reminder.lead_minutes if reminder else 0))
+        lead_column.addWidget(self.lead)
+        time_row.addLayout(clock_column, 2)
+        time_row.addLayout(lead_column, 3)
+        layout.addLayout(time_row)
+        self.link = QLineEdit(reminder.link if reminder else "")
+        self.link.setPlaceholderText("https://meet.google.com/…")
+        self.link.setAccessibleName("Toplantı bağlantısı")
+        self.link.setMaxLength(2048)
+        layout.addWidget(Foldout("Toplantı bağlantısı · isteğe bağlı", self.link, bool(reminder and reminder.link)))
+        self.notes = QTextEdit()
+        self.notes.setAcceptRichText(False)
+        self.notes.setFixedHeight(90)
+        self.notes.setPlaceholderText("İsteğe bağlı not")
+        self.notes.setAccessibleName("Hatırlatma notu")
+        self.notes.setPlainText(reminder.notes if reminder else "")
+        layout.addWidget(Foldout("Not ekle · isteğe bağlı", self.notes, bool(reminder and reminder.notes)))
+        layout.addStretch()
+        self.error = label("", "formError", True)
+        self.error.hide()
+        self.body.addWidget(self.error)
+        self.save_button = self.footer("Kaydet" if reminder else "Hatırlatmayı ekle", self.submit)
         self.title.textChanged.connect(self.validate)
-        self.validate()
+        self.kind.currentIndexChanged.connect(self.update_kind)
+        self.update_kind()
         self.title.setFocus()
+
+    def update_kind(self):
+        kind = self.kind.currentData()
+        self.weekly_box.setVisible(kind == "weekly")
+        self.interval_box.setVisible(kind != "once")
+        self.interval.setSuffix(" haftada bir" if kind == "weekly" else " ayda bir")
+        self.month_day.setVisible(kind == "monthly_day")
+        self.month_hint.setVisible(kind == "monthly_day")
+        self.ordinal_box.setVisible(kind == "monthly_weekday")
+        self.date_label.setText("Tarih" if kind == "once" else "Başlangıç tarihi")
+        self.error.hide()
+        self.validate()
 
     def validate(self):
         if hasattr(self, "save_button"):
-            self.save_button.setEnabled(bool(self.title.text().strip()) and any(b.isChecked() for b in self.days))
+            valid_days = self.kind.currentData() != "weekly" or any(b.isChecked() for b in self.days)
+            self.save_button.setEnabled(bool(self.title.text().strip()) and valid_days)
 
     def select_days(self, selected):
         for index, button in enumerate(self.days):
             button.setChecked(index in selected)
 
+    def submit(self):
+        try:
+            values = self.values()
+            meeting_link(values["link"])
+            unchanged_once = self.reminder and self.reminder.kind == "once" and values["kind"] == "once" and values["anchor_date"] == self.reminder.anchor_date and values["clock"] == self.reminder.clock and values["lead_minutes"] == self.reminder.lead_minutes
+            if not unchanged_once and next_scheduled(values["kind"], values["weekdays"], values["clock"], values["anchor_date"],
+                    values["interval"], values["month_day"], values["ordinal"], values["month_weekday"]) is None:
+                raise ValueError("Gelecekte bir tarih ve saat seç.")
+        except ValueError as exc:
+            self.error.setText(str(exc))
+            self.error.show()
+            return
+        self.accept()
+
     def values(self):
         return dict(title=self.title.text(), notes=self.notes.toPlainText(),
                     weekdays=[i for i, button in enumerate(self.days) if button.isChecked()],
-                    clock=self.clock.time().toString("HH:mm"))
+                    clock=self.clock.time().toString("HH:mm"), kind=self.kind.currentData(),
+                    interval=self.interval.value(), anchor_date=self.date.date().toPython(),
+                    month_day=self.month_day.currentData(), ordinal=self.ordinal.currentData(),
+                    month_weekday=self.month_weekday.currentData(), lead_minutes=self.lead.currentData(), link=self.link.text())
 
 
 class ReminderPanel(QWidget):
@@ -103,7 +211,7 @@ class ReminderPanel(QWidget):
         body = QVBoxLayout(self)
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(12)
-        body.addWidget(label("Düzenli hatırlatmalar", "section"))
+        body.addWidget(label("Hatırlatmalar", "section"))
         body.addWidget(label("Toplantılar, randevular, küçük hatırlatmalar. Takvim kendi ritminde ilerler.", "muted", True))
         add = QPushButton("  Yeni hatırlatma")
         add.setObjectName("primary")
@@ -223,8 +331,9 @@ class ReminderPanel(QWidget):
         layout.addLayout(header)
         if reminder.notes:
             layout.addWidget(label(reminder.notes[:180], "muted", True))
-        day_text = "Her gün" if len(reminder.weekdays) == 7 else "Hafta içi" if reminder.weekdays == tuple(range(5)) else ", ".join(DAY_SHORTS[i] for i in reminder.weekdays)
-        layout.addWidget(label(day_text + " · " + reminder.clock, "muted", True))
+        layout.addWidget(label(rule_label(reminder), "muted", True))
+        if reminder.lead_minutes:
+            layout.addWidget(label(f"Bildirim: {reminder.lead_minutes} dk önce · " + (reminder.next_at - timedelta(minutes=reminder.lead_minutes)).strftime("%H:%M"), "muted", True))
         if reminder.deleted_at is not None:
             countdown = label("", "muted")
             layout.addWidget(countdown)
@@ -232,12 +341,21 @@ class ReminderPanel(QWidget):
             remaining = max(0, math.ceil(reminder.deleted_at + UNDO_SECONDS - time.time()))
             countdown.setText(f"Geri alma süresi: {remaining // 60}:{remaining % 60:02d}")
         else:
-            text = "Duraklatıldı" if reminder.paused else "Sıradaki: " + QLocale("tr_TR").toString(QDate(reminder.next_at.date()), "d MMM ddd") + " · " + reminder.clock
+            text = "Duraklatıldı" if reminder.paused else ("Bildirim gönderildi · " if reminder.kind == "once" and reminder.notified_for else "Sıradaki: ") + QLocale("tr_TR").toString(QDate(reminder.next_at.date()), "d MMM ddd") + " · " + reminder.clock
             if reminder.snooze_at:
                 text += "\nTekrar bildirimi: " + reminder.snooze_at.strftime("%d.%m %H:%M")
             status = label(text, wrap=True)
             status.setStyleSheet(f"color: {accent}; font-size: 11px;")
             layout.addWidget(status)
+            if reminder.link:
+                open_link = QPushButton("Toplantıyı aç  ↗")
+                open_link.setToolTip(reminder.link)
+                open_link.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(reminder.link)))
+                layout.addWidget(open_link)
+            if reminder.kind == "once":
+                if reminder.notified_for:
+                    layout.addWidget(label("Ertelemek için bildirime tıkla. Etkinlikten veya son ertelemeden 24 saat sonra temizlenir.", "muted", True))
+                return card
             actions = QHBoxLayout()
             pause = QPushButton("Devam ettir" if reminder.paused else "Duraklat")
             pause.clicked.connect(lambda: self.change(lambda: self.owner.store.pause_reminder(reminder.id, not reminder.paused),
@@ -254,16 +372,17 @@ class ReminderPanel(QWidget):
         current = next((r for r in self.owner.store.reminders() if r.id == reminder.id and r.deleted_at is None and not r.paused), None)
         if current is None:
             return
-        dialog = QDialog(self.owner, Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
-        dialog.setWindowTitle("Odak hatırlatması")
-        dialog.setMinimumWidth(370)
-        body = QVBoxLayout(dialog)
-        body.setContentsMargins(24, 24, 24, 24)
-        body.setSpacing(14)
+        dialog = StyledDialog(self.owner, "Odak hatırlatması", 430, 380)
+        body = dialog.body
         body.addWidget(label(current.title, "section", True))
+        body.addWidget(label("Ertelediğin hatırlatma" if reminder.snooze_at else reminder.next_at.strftime("%d.%m.%Y · %H:%M"), "muted"))
+        if current.link:
+            open_link = QPushButton("Toplantıyı aç  ↗")
+            open_link.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(current.link)))
+            body.addWidget(open_link)
         if current.notes:
             body.addWidget(label(current.notes, "muted", True))
-        body.addWidget(label("İstersen 10 dakika sonra tekrar haber verelim. Düzenli programın aynı kalır.", "muted", True))
+        body.addWidget(label("İstersen 10 dakika sonra tekrar haber verelim.", "muted", True))
         snooze = QPushButton("10 dakika sonra hatırlat")
         snooze.setObjectName("primary")
         snooze.clicked.connect(dialog.accept)

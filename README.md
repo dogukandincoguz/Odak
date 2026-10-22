@@ -39,25 +39,41 @@ Otomatik başlatmayı kapatmak için `Win+R` → `shell:startup` klasöründeki 
 - Kalem simgesi başlığı, notu ve deadline'ı düzenler. **Ctrl+F** aramayı açar; arama seçili bölümde başlık ve notları tarar.
 - Eksi düğmesi pencereyi sistem tepsisine gizler. Sağ alttaki tepsi simgesine tıklayarak veya sağ tık → **Odak’ı göster** ile pencereyi geri açabilirsiniz. Üç nokta menüsünden sağ üste yeniden yerleştirilebilir.
 - Pencereyi üstteki logo veya başlık alanından sol tıkla tutup sürükleyerek taşıyabilirsiniz. Konum kaydedilmez; her yeni açılışta yine sağ üst köşede başlar.
+- Kenarlardan veya sağ alt köşedeki tutamaktan pencereyi boyutlandırabilirsiniz. Boyut kaydedilir; sonraki açılışta bu boyutla sağ üstte açılır. Yeni görev, hatırlatma ve şablon pencereleri kendi üst barlarından taşınır; üstteki kutusuz `×` formu kapatır.
+- Uygulama birlikte gelen **Inter** yazı tipini kullanır; ayrıca font kurulumu gerekmez. Yazı tipi lisansı `assets/fonts/OFL.txt` içindedir.
 - `×` uygulamayı kapatır. Odak kısayolunu tekrar açmak var olan pencereyi öne getirir; ikinci kopya çalışmaz.
 
 ## Günlük plan ve fikirler
 
 - **Bugün:** görev seçeneklerinden **Bugün yapacağım** ile günlük listenizi seçin. Tarih değişince günlük seçim sıfırlanır; görevler silinmez.
+- **Bugünkü sıra:** arama boşken kartın solundaki altı noktalı tutamağı sürükleyerek çalışma sıranızı belirleyin. Bırakılacak yer çizgiyle gösterilir. Sıra kaydedilir; deadline değişmez. Tutamak klavye odağındayken yukarı/aşağı okları da sıralamayı değiştirir.
 - **Bir gün:** henüz başlamayacağınız fikirleri bu bölümde saklayın. Görev seçeneklerinden aktif listeye veya Bugün'e taşıyabilirsiniz. Bu bölümdeki fikirler deadline'ı geçenler listesine girmez.
 - **Alt adımlar:** görev formunda her satıra bir adım yazın. Karttaki **Adımlar** düğmesi listeyi açar; tamamlanan adımların sayısı gösterilir. Aynı adımlar düzenleme ve sıralama sırasında tamamlanma durumlarını korur.
 - **Türkçe tarih önerisi:** başlığa `Yarın 18.00 raporu gönder`, `Cuma kitap al`, `3 gün sonra taslağı bitir` veya `25.10.2026 saat 09:30 sunum` yazabilirsiniz. Algılanan tarih öneri olarak gösterilir; **Uygula** düğmesine bastığınızda başlık temizlenir ve tarih/saat alanları dolar. Tarih önerisini uygulamak zorunlu değildir.
 
-## Düzenli hatırlatmalar
+## Görev şablonları
 
-Üstteki **Hatırlatmalar** bölümünden başlık, isteğe bağlı not, tekrar günleri ve saat seçin. Haftanın birden çok günü, **Her gün** veya **Hafta içi** seçilebilir.
+Yeni görev penceresindeki **Şablon kullan** alanından hazır başlık, not ve adımları seçebilirsiniz. **Bu görevden şablon oluştur** mevcut formdaki alanları şablon olarak kaydeder. Üç nokta menüsündeki **Görev şablonları** veya şablon seçiminin yanındaki menü üzerinden şablon ekleyebilir, düzenleyebilir ve silebilirsiniz.
+
+Şablonlar tarih, saat, günlük seçim veya tamamlanma durumu kopyalamaz. Her kullanım bağımsız bir görev ve bağımsız adımlar oluşturur. Şablonun silinmesi ondan oluşturulan görevleri etkilemez. Form doluyken başka bir şablon seçilirse alanların değiştirilmesi için onay istenir.
+
+## Hatırlatmalar
+
+Üstteki **Hatırlatmalar** bölümünden başlık, tekrar türü, tarih ve etkinlik saati seçin. Not ve toplantı bağlantısı isteğe bağlıdır.
+
+- **Haftalık:** haftanın birden çok günü, **Her gün** veya **Hafta içi**; 1–52 haftada bir tekrar. Başlangıç tarihinin haftası temel alınır; örneğin iki haftada bir pazartesi o haftadan başlayarak ilerler.
+- **Bir kez:** gelecekteki bir tarih ve saatte tek bildirim. Bildirimden sonra erteleme için kayıt geçici olarak kalır; etkinlikten veya son ertelemeden 24 saat sonra otomatik temizlenir. Eski tek seferlik kayıtlar birikmez.
+- **Aylık · belirli gün:** 1–31 veya **Ayın son günü**, 1–52 ayda bir. Seçilen günün bulunmadığı aylar atlanır; son gün seçimi şubat ve artık yılları takip eder.
+- **Aylık · haftanın belirli günü:** ilk, ikinci, üçüncü, dördüncü veya son pazartesi/cuma gibi bir gün; 1–52 ayda bir.
+- **Bildirim:** etkinlik saatinde veya 5, 10, 30 dakika önce. Örneğin 14.00 toplantısı için 10 dakika önce seçilirse 13.50'de haber verilir; 14.00'te ikinci bildirim oluşmaz. Kartta etkinlik saati ile bildirim tercihi ayrı görünür.
+- **Toplantıyı aç:** kaydedilmiş HTTP/HTTPS bağlantısını varsayılan tarayıcıda açar. Bağlantı hem karttan hem bildirime tıklayınca açılan pencereden kullanılabilir.
 
 - Her hatırlatma tek kayıttır; tekrarlarda yeni görev veya geçmiş kaydı üretilmez.
-- Zamanı gelince Windows bildirimi çıkar. Bildirime tıklayarak **10 dakika sonra hatırlat** seçebilirsiniz. Bu işlem haftalık programı değiştirmez.
-- **Bu tekrarı atla**, sıradaki takvim zamanını atlar. **Duraklat / devam ettir** programı silmeden kapatıp açar.
+- Zamanı gelince Windows bildirimi çıkar. Bildirime tıklayarak **10 dakika sonra hatırlat** seçebilirsiniz. Bu işlem düzenli programı değiştirmez.
+- Düzenli hatırlatmalarda **Bu tekrarı atla**, sıradaki takvim zamanını atlar. **Duraklat / devam ettir** programı silmeden kapatıp açar. Tek seferlik hatırlatmanın tarihini düzenleyebilir veya kaydı silebilirsiniz.
 - Tamamlandı düğmesi bulunmaz; hatırlatmalar görev veya deadline'ı geçenler listelerine eklenmez.
 - Silinen hatırlatmalar bu bölümün sağındaki **Son silinenler** sekmesinden 10 dakika geri alınabilir.
-- Uygulama kapalıyken geçen eski bildirimler birikmez. Açılışta son 15 dakikada gelen bir hatırlatma gösterilebilir; daha eskileri sonraki takvim zamanına ilerler.
+- Uygulama kapalıyken geçen eski bildirimler birikmez. Açılışta son 15 dakikada gelen veya etkinliği henüz başlamamış bir hatırlatma gösterilebilir; daha eskileri sonraki takvim zamanına ilerler. Yeni hatırlatmanın ön bildirim saati geçmişse ve etkinlik hâlâ gelecekteyse hemen haber verilir.
 
 ## Odak sayacı
 
@@ -69,7 +85,7 @@ Sayaç tepsiye gizlendiğinde çalışır ve açılışlar arasında durumunu ko
 
 Üç nokta menüsünden:
 
-- **Dışa aktar:** görevleri, adımları ve hatırlatmaları taşınabilir JSON dosyasına kaydeder.
+- **Dışa aktar:** görevleri, adımları, günlük sıralamayı, hatırlatma kurallarını ve şablonları taşınabilir JSON dosyasına kaydeder.
 - **İçe aktar:** JSON'daki yeni kayıtları ekler. Aynı kimlikli mevcut kayıtları değiştirmez.
 - **Şimdi yedek al:** veritabanının güvenli anlık kopyasını alır.
 - **Yedekten geri yükle:** mevcut verileri seçilen yedekle değiştirir; işlem öncesi mevcut durumun yedeği alınır.
@@ -100,3 +116,11 @@ uv run --locked python tools/check_task_dialog.py
 ```
 
 Bu kontrol kısa süreli bir test penceresi açar ve geçici veritabanı kullanır.
+
+Gerçek fare olaylarıyla Bugün listesini sıralama, köşeden boyutlandırma ve form üst barından taşımayı kontrol etmek için:
+
+```powershell
+uv run --locked python tools/check_features.py
+```
+
+Bu kontrol fareyi birkaç saniye hareket ettirir; gerçek görev verilerini kullanmaz.

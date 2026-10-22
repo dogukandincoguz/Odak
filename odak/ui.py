@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import os
 import time
 from datetime import date, datetime
 from pathlib import Path
@@ -17,7 +16,9 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QDateEdit, QDialog,
 from .model import Store, Task, UNDO_SECONDS, category, make_deadline, time_label
 from .backups import Backups, export_json, import_json
 from .schedule import suggest_date
-from .controls import TimeField, field_style
+from .controls import ChoiceBox, TimeField, field_style
+from .windows import StyledDialog, DragHeader, FileDialog, Foldout, WINDOW_STYLE, make_resize_handles, position_resize_handles
+from .ordering import TaskDropArea, TaskGrip
 
 COLORS = {"neutral": "#9a8bff", "urgent": "#ff828e", "soon": "#efc575",
           "overdue": "#ff828e", "done": "#80d3b5", "trash": "#9cacc2", "someday": "#9cacc2"}
@@ -28,7 +29,7 @@ def search_key(text: str) -> str:
     return text.casefold().replace("\u0307", "").replace("ı", "i")
 
 STYLE = """
-QWidget { color: #e8edf7; font-family: 'Segoe UI'; font-size: 13px; }
+QWidget { color: #e8edf7; font-family: 'Inter'; font-size: 13px; }
 QFrame#surface { background: #111722; border: 1px solid #303849; border-radius: 20px; }
 QDialog { background: #141b28; }
 QLabel { background: transparent; border: none; }
@@ -82,14 +83,13 @@ QCalendarWidget QAbstractItemView { background: #141b28; selection-background-co
 
 
 def configure_app(app: QApplication):
-    # Qt'nin offscreen sürücüsü Windows yazı tiplerini kendiliğinden yüklemez.
-    if "Segoe UI" not in QFontDatabase.families():
-        font_dir = Path(os.environ.get("SystemRoot", "C:/Windows")) / "Fonts"
-        for filename in ("segoeui.ttf", "seguisb.ttf", "segoeuib.ttf"):
-            QFontDatabase.addApplicationFont(str(font_dir / filename))
-    app.setFont(QFont("Segoe UI", 10))
+    if "Inter" not in QFontDatabase.families():
+        font = Path(__file__).resolve().parents[1] / "assets/fonts/Inter.ttf"
+        if QFontDatabase.addApplicationFont(str(font)) == -1:
+            raise RuntimeError("Uygulamanın Inter yazı tipi yüklenemedi.")
+    app.setFont(QFont("Inter", 10))
     app.setStyle("Fusion")
-    app.setStyleSheet(STYLE + field_style())
+    app.setStyleSheet(STYLE + field_style() + WINDOW_STYLE)
     QLocale.setDefault(QLocale("tr_TR"))
 
 
@@ -207,9 +207,7 @@ class CountTab(QPushButton):
 
 
 def choose_file(parent, title: str, location: str, pattern: str, saving=False) -> str:
-    dialog = QFileDialog(parent, title, location, pattern)
-    dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
-    dialog.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
+    dialog = FileDialog(parent, title, location, pattern)
     dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave if saving else QFileDialog.AcceptMode.AcceptOpen)
     dialog.setFileMode(QFileDialog.FileMode.AnyFile if saving else QFileDialog.FileMode.ExistingFile)
     if saving:
@@ -223,72 +221,37 @@ def choose_file(parent, title: str, location: str, pattern: str, saving=False) -
 
 
 def message_box(parent, title: str, text: str, question=False):
-    dialog = QMessageBox(parent)
-    dialog.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
-    dialog.setWindowTitle(title)
-    dialog.setTextFormat(Qt.TextFormat.PlainText)
-    dialog.setText(text)
-    dialog.setIcon(QMessageBox.Icon.Question if question else QMessageBox.Icon.Critical)
-    dialog.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                             if question else QMessageBox.StandardButton.Ok)
+    dialog = StyledDialog(parent, title, 460, 280 if question else 340)
+    dialog.body.addWidget(label(text, wrap=True), 1)
+    actions = QHBoxLayout()
     if question:
-        dialog.setDefaultButton(QMessageBox.StandardButton.No)
-    result = QMessageBox.StandardButton(dialog.exec())
+        no = QPushButton("Hayır")
+        no.setDefault(True)
+        no.clicked.connect(dialog.reject)
+        yes = QPushButton("Evet")
+        yes.setObjectName("primary")
+        yes.clicked.connect(dialog.accept)
+        actions.addWidget(no)
+        actions.addWidget(yes, 1)
+    else:
+        okay = QPushButton("Tamam")
+        okay.setObjectName("primary")
+        okay.clicked.connect(dialog.accept)
+        actions.addWidget(okay)
+    dialog.body.addLayout(actions)
+    accepted = dialog.exec() == QDialog.DialogCode.Accepted
     dialog.deleteLater()
-    return result
+    return (QMessageBox.StandardButton.Yes if accepted else QMessageBox.StandardButton.No) if question else QMessageBox.StandardButton.Ok
 
 
-class DragHeader(QWidget):
-    def __init__(self, parent: QWidget):
-        super().__init__(parent)
-        self._drag_offset = None
-        self.setCursor(Qt.CursorShape.OpenHandCursor)
-        self.setToolTip("Taşımak için sol tıkla tutup sürükle")
-
-    def mousePressEvent(self, event):
-        if event.button() != Qt.MouseButton.LeftButton:
-            return super().mousePressEvent(event)
-        self._drag_offset = None
-        handle = self.window().windowHandle()
-        # Windows'un taşıma davranışı farklı ekran ölçeklerinde de çalışır.
-        if handle is None or not handle.startSystemMove():
-            self._drag_offset = event.globalPosition().toPoint() - self.window().pos()
-            self.setCursor(Qt.CursorShape.ClosedHandCursor)
-        event.accept()
-
-    def mouseMoveEvent(self, event):
-        if self._drag_offset is not None and event.buttons() & Qt.MouseButton.LeftButton:
-            self.window().move(event.globalPosition().toPoint() - self._drag_offset)
-            event.accept()
-            return
-        super().mouseMoveEvent(event)
-
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_offset = None
-            self.setCursor(Qt.CursorShape.OpenHandCursor)
-            event.accept()
-            return
-        super().mouseReleaseEvent(event)
-
-
-class TaskDialog(QDialog):
+class TaskDialog(StyledDialog):
     def __init__(self, parent: QWidget, task: Task | None = None):
-        # Ana pencere gibi üstte kalmalı; aksi hâlde Windows formu arkaya atar.
-        # Tool türü, formun da görev çubuğunda ayrı simge açmasını önler.
-        super().__init__(parent, Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
+        super().__init__(parent, "Görevi düzenle" if task else "Yeni görev", 460, 720)
         self.task = task
-        self.setWindowTitle("Görevi düzenle" if task else "Yeni görev")
+        self.owner = parent
         self.setWindowIcon(app_icon())
-        self.setMinimumWidth(400)
-        self.resize(440, min(740, self.screen().availableGeometry().height() - 64))
-        self.setModal(True)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(13)
-        layout.addWidget(label("BİR SONRAKİ ADIM", "eyebrow"))
-        layout.addWidget(label("Görevi düzenle" if task else "Aklındakini listeye al.", "section"))
-        layout.addSpacing(3)
+        layout = self.body
+        layout.addWidget(label("Bir sonraki adımı belirle. Detayları istersen ekle.", "muted", True))
         outer_layout = layout
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -298,10 +261,20 @@ class TaskDialog(QDialog):
         outer_layout.addWidget(scroll, 1)
         layout = QVBoxLayout(fields)
         layout.setContentsMargins(0, 0, 7, 0)
-        layout.setSpacing(10)
-        layout.addWidget(label("Görev başlığı"))
+        layout.setSpacing(12)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        if task is None:
+            template_row = QHBoxLayout()
+            self.template_choice = ChoiceBox()
+            self.template_choice.setAccessibleName("Görev şablonu")
+            self.reload_templates()
+            template_row.addWidget(self.template_choice, 1)
+            template_row.addWidget(tool("menu", "Şablonları yönet", self.manage_templates))
+            layout.addLayout(template_row)
+        layout.addWidget(label("Görev başlığı", "muted"))
         self.title = QLineEdit(task.title if task else "")
         self.title.setMaxLength(180)
+        self.title.setObjectName("taskTitle")
         self.title.setPlaceholderText("Neyi tamamlamak istiyorsun?")
         self.title.setAccessibleName("Görev başlığı")
         layout.addWidget(self.title)
@@ -310,22 +283,28 @@ class TaskDialog(QDialog):
         self.date_suggestion.hide()
         self.date_suggestion.clicked.connect(self.apply_suggestion)
         layout.addWidget(self.date_suggestion)
-        layout.addWidget(label("Not · isteğe bağlı", "muted"))
         self.notes = QTextEdit()
         self.notes.setAcceptRichText(False)
         self.notes.setPlainText(task.notes if task else "")
         self.notes.setPlaceholderText("İhtiyacın olan detaylar…")
         self.notes.setAccessibleName("Görev notu")
         self.notes.setFixedHeight(65)
-        layout.addWidget(self.notes)
-        layout.addWidget(label("Alt adımlar · her satıra bir adım", "muted"))
+        self.notes_fold = Foldout("Not ekle · isteğe bağlı", self.notes, bool(task and task.notes))
+        layout.addWidget(self.notes_fold)
         self.steps = QTextEdit()
         self.steps.setAcceptRichText(False)
         self.steps.setFixedHeight(74)
         self.steps.setPlaceholderText("Verileri topla\nTaslağı hazırla\nSon kontrol")
         self.steps.setAccessibleName("Görevin alt adımları")
         self.steps.setPlainText("\n".join(s.title for s in task.steps) if task else "")
-        layout.addWidget(self.steps)
+        self.steps_fold = Foldout("Alt adımlar · her satıra bir adım", self.steps, bool(task and task.steps))
+        layout.addWidget(self.steps_fold)
+        save_template = QPushButton("Bu görevden şablon oluştur")
+        save_template.setObjectName("tab")
+        save_template.setEnabled(bool(self.title.text().strip()))
+        self.title.textChanged.connect(lambda t: save_template.setEnabled(bool(t.strip())))
+        save_template.clicked.connect(self.save_as_template)
+        layout.addWidget(save_template)
         choices = QHBoxLayout()
         self.for_today = QCheckBox("Bugün yapacağım")
         self.for_today.setChecked(task.today == date.today().isoformat() if task else getattr(parent, "current_tab", "") == "today")
@@ -387,7 +366,50 @@ class TaskDialog(QDialog):
         self.save_button.setEnabled(bool(self.title.text().strip()))
         self.title.returnPressed.connect(lambda: self.accept() if self.save_button.isEnabled() else None)
         QShortcut(QKeySequence("Ctrl+Return"), self, activated=lambda: self.accept() if self.save_button.isEnabled() else None)
+        if task is None:
+            self.template_choice.currentIndexChanged.connect(self.apply_template)
         self.title.setFocus()
+
+    def reload_templates(self):
+        self.template_choice.blockSignals(True)
+        self.template_choice.clear()
+        self.template_choice.addItem("Şablon kullan · isteğe bağlı", None)
+        for template in self.owner.store.templates():
+            self.template_choice.addItem(template.name, template.id)
+        self.template_choice.setEnabled(self.template_choice.count() > 1)
+        self.template_choice.blockSignals(False)
+
+    def manage_templates(self):
+        from .templates import TemplateManager
+        dialog = TemplateManager(self, self.owner.store)
+        dialog.exec()
+        dialog.deleteLater()
+        self.reload_templates()
+
+    def apply_template(self):
+        identity = self.template_choice.currentData()
+        template = next((t for t in self.owner.store.templates() if t.id == identity), None)
+        if template is None:
+            return
+        if any((self.title.text().strip(), self.notes.toPlainText().strip(), self.steps.toPlainText().strip())):
+            if message_box(self, "Şablonu uygula", "Başlık, not ve alt adımlar seçtiğin şablonla değiştirilsin mi?", question=True) != QMessageBox.StandardButton.Yes:
+                self.template_choice.blockSignals(True)
+                self.template_choice.setCurrentIndex(0)
+                self.template_choice.blockSignals(False)
+                return
+        self.title.setText(template.title)
+        self.notes.setPlainText(template.notes)
+        self.steps.setPlainText("\n".join(template.steps))
+        self.notes_fold.toggle.setChecked(bool(template.notes))
+        self.steps_fold.toggle.setChecked(bool(template.steps))
+
+    def save_as_template(self):
+        from .templates import TemplateEditor
+        dialog = TemplateEditor(self, self.owner.store, values=self.values())
+        dialog.exec()
+        dialog.deleteLater()
+        if self.task is None:
+            self.reload_templates()
 
     def update_suggestion(self):
         suggestion = suggest_date(self.title.text())
@@ -440,6 +462,8 @@ class TaskCard(QFrame):
         body.setSpacing(9)
         top = QHBoxLayout()
         top.setSpacing(10)
+        if owner.current_tab == "today" and not owner.search.text().strip():
+            top.addWidget(TaskGrip(owner, task.id, self), 0, Qt.AlignmentFlag.AlignTop)
         if self.kind != "trash":
             top.addWidget(tool("check" if self.kind == "done" else "circle",
                 "Yeniden aç" if self.kind == "done" else "Tamamlandı işaretle",
@@ -534,6 +558,18 @@ class MainWindow(QWidget):
         self.cards: list[TaskCard] = []
         self.snapshot = None
         self.notice_until = 0.0
+        self._task_dragging = False
+        self._today_order = []
+        self._size_ready = False
+        self._anchoring = False
+        self._preferred_size = self.store.setting("window_size", [460, 840])
+        if not isinstance(self._preferred_size, list) or len(self._preferred_size) != 2 or any(type(v) is not int for v in self._preferred_size):
+            self._preferred_size = [460, 840]
+        self._size_timer = QTimer(self)
+        self._size_timer.setSingleShot(True)
+        self._size_timer.setInterval(600)
+        self._size_timer.timeout.connect(self.save_size)
+        self._resize_handles = []
         self.setWindowTitle("Odak · Görevlerin")
         self.setWindowIcon(app_icon())
         self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint |
@@ -652,7 +688,7 @@ class MainWindow(QWidget):
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.list_widget = QWidget()
+        self.list_widget = TaskDropArea(self)
         self.task_layout = QVBoxLayout(self.list_widget)
         self.task_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         self.task_layout.setContentsMargins(0, 0, 5, 0)
@@ -697,23 +733,43 @@ class MainWindow(QWidget):
             self.tray.show()
         self.set_tab("active")
         self.set_view("tasks")
+        self._resize_handles = make_resize_handles(self)
         self.anchor()
+        self._size_ready = True
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        position_resize_handles(self, self._resize_handles)
+        if self._size_ready and not self._anchoring and event.oldSize().isValid():
+            self._preferred_size = [event.size().width(), event.size().height()]
+            self._size_timer.start()
+
+    def save_size(self):
+        try:
+            self.store.set_setting("window_size", self._preferred_size)
+        except Exception as exc:
+            self.report_error(exc)
 
     def anchor(self):
         screen = self.screen() or QApplication.primaryScreen()
         if screen is None:
             return
         rect = screen.availableGeometry()
-        width = min(460, rect.width() - 24)
-        height = min(840, rect.height() - 32)
-        self.setFixedSize(width, height)
+        width = min(max(440, self._preferred_size[0]), rect.width() - 24)
+        height = min(max(700, self._preferred_size[1]), rect.height() - 32)
+        self._anchoring = True
+        self.setMinimumSize(min(440, rect.width() - 24), min(700, rect.height() - 32))
+        self.setMaximumSize(rect.width() - 24, rect.height() - 32)
+        self.resize(width, height)
         self.move(rect.right() - width - 15, rect.top() + 16)
+        self._anchoring = False
 
     def show_menu(self):
         menu = QMenu(self)
         menu.addAction("Sağ üste yerleştir", self.anchor)
         menu.addAction("Yeni görev\tCtrl+N", lambda: self.edit_task())
-        menu.addAction("Yeni düzenli hatırlatma", self.reminder_panel.edit_reminder)
+        menu.addAction("Yeni hatırlatma", self.reminder_panel.edit_reminder)
+        menu.addAction("Görev şablonları", self.manage_templates)
         menu.addSeparator()
         menu.addAction("Dışa aktar…", self.export_data)
         menu.addAction("İçe aktar…", self.import_data)
@@ -726,6 +782,21 @@ class MainWindow(QWidget):
         menu.addSeparator()
         menu.addAction("Uygulamayı kapat", self.close)
         menu.exec(self.menu_button.mapToGlobal(self.menu_button.rect().bottomLeft()))
+
+    def manage_templates(self):
+        from .templates import TemplateManager
+        dialog = TemplateManager(self, self.store)
+        dialog.exec()
+        dialog.deleteLater()
+
+    def move_today(self, identity, target, after=False):
+        order = self._today_order.copy()
+        if identity == target or identity not in order or target not in order:
+            return
+        order.remove(identity)
+        index = order.index(target) + int(after)
+        order.insert(index, identity)
+        self.perform(lambda: self.store.reorder_today(order), "Bugünkü sıralaman kaydedildi.")
 
     def set_view(self, view: str):
         self.current_view = view
@@ -772,7 +843,7 @@ class MainWindow(QWidget):
         for key, button in self.tabs.items():
             button.setChecked(key == tab)
         titles = {"active": ("Görevlerin", "Deadline’ı yakın olanlar en üstte."),
-                  "today": ("Bugün yapacaklarım", "Bugün odaklanmak için seçtiğin görevler. Seçim her gün yenilenir."),
+                  "today": ("Bugün yapacaklarım", "Tutamaktan sürükleyerek sırala. Günlük seçim tarih değişince yenilenir."),
                   "someday": ("Bir gün yaparım", "Hazır olduğunda görev seçeneklerinden aktif listeye taşı."),
                   "overdue": ("Deadline’ı geçenler", "Süresi geçen görevlerini buradan yönetebilirsin."),
                   "done": ("Tamamlananlar", "İlerleme burada birikir. Eline sağlık."),
@@ -786,7 +857,11 @@ class MainWindow(QWidget):
     def tick(self):
         for reminder in self.store.due_reminders():
             self.last_reminder = reminder
-            self.system_notice(reminder.title, reminder.notes or "Düzenli hatırlatman geldi. Ertelemek için bildirime tıkla.", reminder=reminder)
+            timing = reminder.next_at.strftime("%d.%m · %H:%M")
+            message = "Ertelediğin hatırlatma." if reminder.snooze_at is not None else "Etkinlik: " + timing
+            if reminder.notes:
+                message += "\n" + reminder.notes
+            self.system_notice(reminder.title, message + "\nAçmak veya ertelemek için bildirime tıkla.", reminder=reminder)
         self.refresh()
         if self.current_view == "reminders":
             self.reminder_panel.refresh()
@@ -802,6 +877,8 @@ class MainWindow(QWidget):
             self.notice.hide()
 
     def refresh(self, force: bool = False):
+        if self._task_dragging:
+            return
         try:
             self.store.purge()
             revision = self.store.db.total_changes
@@ -829,12 +906,14 @@ class MainWindow(QWidget):
         self.date_label.setText(QLocale("tr_TR").toString(QDate.currentDate(), "d MMM, ddd"))
         for key, button in self.tabs.items():
             button.set_count(len(groups[key]))
+        groups["today"].sort(key=lambda t: (t.today_position is None, t.today_position or 0, t.deadline or datetime.max, -t.created_at))
+        self._today_order = [t.id for t in groups["today"]]
         shown = groups[self.current_tab]
-        if self.current_tab in ("active", "overdue", "today", "someday"):
+        if self.current_tab in ("active", "overdue", "someday"):
             shown.sort(key=lambda t: (t.deadline or datetime.max, -t.created_at))
         elif self.current_tab == "trash":
             shown.sort(key=lambda t: t.deleted_at, reverse=True)
-        else:
+        elif self.current_tab == "done":
             shown.sort(key=lambda t: t.completed_at, reverse=True)
         query = search_key(self.search.text().strip())
         if query:
@@ -996,6 +1075,9 @@ class MainWindow(QWidget):
         self.activateWindow()
 
     def closeEvent(self, event):
+        if self._size_timer.isActive():
+            self._size_timer.stop()
+            self.save_size()
         self.timer.stop()
         if self.tray:
             self.tray.hide()
