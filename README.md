@@ -1,56 +1,69 @@
 # Odak
 
-Windows açılışında sağ üstte başlayan, diğer normal pencerelerin üzerinde duran yerel görev takipçisi. Görev çubuğunda görünmez; simgesi sağ alttaki sistem tepsisindedir. İnternet veya hesap gerektirmez. Kapatma düğmesi uygulamayı tamamen kapatır; sonraki Windows oturumunda yeniden açılır.
+Windows için görev, hatırlatma ve odak sayacı uygulaması. Windows hesabınıza giriş yaptığınızda sağ üstte açılır ve diğer normal pencerelerin üzerinde kalır. Görev çubuğunda görünmez; simgesi sağ alttaki sistem tepsisindedir. Kurulumdan sonra çevrimdışı çalışır ve hesap gerektirmez. Görevler bu bilgisayarda saklanır.
 
 ## Tek komutla kurulum ve güncelleme
 
-Windows PowerShell 5.1 veya PowerShell 7'de:
+Windows PowerShell 5.1 veya PowerShell 7'yi açıp şu komutu çalıştırın:
 
 ```powershell
 irm https://raw.githubusercontent.com/dogukandincoguz/Odak/dev/bootstrap.ps1 | iex
 ```
 
-Git, Python veya yönetici yetkisi gerekmez. Betik `dev` branch'inin o anki commitini indirir; uv yoksa [resmi Astral kurucusuyla](https://docs.astral.sh/uv/getting-started/installation/) kullanıcıya özel kurar. Python 3.13 yoksa uv üzerinden indirir; bağımlılıkları `uv.lock` ile kurar. Masaüstü ve Windows başlangıç kısayollarını oluşturup Odak'ı açar. Aynı komut tekrar çalıştırıldığında günceller.
+Önceden Git veya Python kurmanız gerekmez; yönetici yetkisi, GitHub hesabı veya token da istenmez. **Kurulum ve güncelleme için internet bağlantısı gerekir.**
+
+Betik, geliştirmelerin yayımlandığı **`dev` dalının** o anki commitini indirir. uv yoksa [resmi Astral kurucusuyla](https://docs.astral.sh/uv/getting-started/installation/) kullanıcıya özel kurar; Python 3.13 yoksa uv üzerinden indirir. Bağımlılıkları `uv.lock` dosyasındaki sürümlerle kurar, masaüstü ve Windows başlangıç kısayollarını oluşturur ve Odak'ı açar.
+
+Kurulumdan sonra masaüstündeki **Odak** kısayolunu kullanabilirsiniz; terminal penceresi açılmaz. **Güncellemek için aynı komutu yeniden çalıştırın.** Uygulama güncellemeleri kendiliğinden indirmez.
 
 - Uygulama dosyaları: `%LOCALAPPDATA%\Programs\Odak`
 - Görevler, ayarlar ve yedekler: `%LOCALAPPDATA%\Odak\data`
 - Otomatik indirilen uv: `%LOCALAPPDATA%\Programs\Odak-Tools\uv`; var olan uv varsa kullanılır.
 
-Uygulama ve veriler ayrı tutulur. Güncelleme öncesi veri yedeği alınır; son üç yedek korunur. Açık Odak normal biçimde kapatılır; kaydedilmemiş bir form varsa kurulum durur ve formu kaydetmeniz istenir. Ortam doğrulaması başarısız olursa önceki uygulama dosyaları geri konur; aynı komutla yeniden denenebilir. Hedef klasörün boş veya bu betikle yönetilen bir Odak kurulumu olması gerekir.
+Uygulama ve veriler ayrı tutulur. Güncelleme öncesi veri yedeği alınır; son üç yedek korunur. Açık Odak normal biçimde kapatılır. Açık bir form veya devam eden bir işlem varsa kurulum durur; formu kaydedip veya kapatıp yeniden deneyin. Ortam doğrulaması başarısız olursa önceki uygulama dosyaları geri konur; aynı komutla yeniden denenebilir. Hedef klasörün boş veya bu betikle yönetilen bir Odak kurulumu olması gerekir.
 
-Eski yerel kurulumdan ilk geçişte mevcut masaüstü kısayolunun veri klasörü bulunur. Yeni veri klasörü boşsa SQLite'ın yedekleme API'siyle kopyalanır; eski veri dosyası korunur. Yeni konumda zaten veritabanı varsa eski kopyayla değiştirilmez.
+Eski kaynak kod kurulumundan ilk geçişte mevcut masaüstü kısayolunun veri klasörü bulunur. Yeni konumda henüz veritabanı yoksa eski veritabanı SQLite'ın yedekleme API'siyle kopyalanır; eski veri dosyası korunur. Yeni konumda zaten veritabanı varsa eski kopyayla değiştirilmez.
 
-`irm | iex` bağlantıdaki PowerShell kodunu doğrudan çalıştırır. Çalıştırılacak dosya [bootstrap.ps1](bootstrap.ps1) içinde incelenebilir. Public repo için yukarıdaki komut giriş gerektirmez. Gizli repo için içerik okuma yetkili GitHub token'ı gerekir; token komut geçmişine yazılmadan alınabilir:
+`irm | iex` bağlantıdaki PowerShell kodunu indirip doğrudan çalıştırır. Kurulum betiğini çalıştırmadan önce [buradan inceleyebilirsiniz](https://github.com/dogukandincoguz/Odak/blob/dev/bootstrap.ps1).
+
+Kurulum betiğini dosya olarak indirip çalıştırırken aşağıdaki seçenekler kullanılabilir:
+
+| Parametre | İşlev |
+| --- | --- |
+| `-InstallDir` | Uygulamanın kurulacağı klasörü seçer. |
+| `-DataDir` | Verilerin saklanacağı klasörü seçer; uygulama klasöründen ayrı olmalıdır. |
+| `-Ref` | İndirilecek Git dalını, etiketini veya commitini seçer; varsayılan `dev` değeridir. |
+| `-NoLaunch` | Kurulum sonunda uygulamayı açmaz. |
+| `-NoShortcuts` | Masaüstü ve Windows başlangıç kısayollarını oluşturmaz veya değiştirmez. |
+
+Örneğin, kısayollara dokunmadan kurmak veya güncellemek için:
 
 ```powershell
-$odakSecret = Read-Host 'GitHub token' -AsSecureString
-$odakToken = [Net.NetworkCredential]::new('', $odakSecret).Password
-try {
-    $odakHeaders = @{ Authorization = 'Bearer ' + $odakToken; Accept = 'application/vnd.github.raw+json' }
-    $odakScript = irm 'https://api.github.com/repos/dogukandincoguz/Odak/contents/bootstrap.ps1?ref=dev' -Headers $odakHeaders
-    & ([ScriptBlock]::Create($odakScript)) -GitHubToken $odakToken
-} finally {
-    Remove-Variable odakToken, odakSecret, odakHeaders, odakScript -ErrorAction SilentlyContinue
-}
+Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/dogukandincoguz/Odak/dev/bootstrap.ps1' -OutFile .\odak-bootstrap.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\odak-bootstrap.ps1 -NoShortcuts
 ```
 
-Kurulum dosyası indirildikten sonra `-InstallDir`, `-DataDir`, `-Ref`, `-NoLaunch` ve `-NoShortcuts` parametreleri de kullanılabilir. Aynı kuruluma ait veri klasörü kurulum kaydından hatırlanır. Yönetici olarak açmak veya sistemin kalıcı execution policy ayarını değiştirmek gerekmez.
+Aynı kuruluma ait veri klasörü kurulum kaydından hatırlanır. Sistemin kalıcı PowerShell yürütme ilkesini değiştirmeniz gerekmez.
+
+## Otomatik başlatma ve kapatma
+
+Kurulum, Windows hesabınıza girişte Odak'ı başlatan bir kısayol oluşturur. Otomatik başlatmayı kapatmak için `Win+R` → `shell:startup` klasöründeki **Odak** kısayolunu kaldırın. Uygulama ve görev verileri silinmez. Kurulum komutunu yeniden çalıştırmak bu kısayolu tekrar oluşturur; bunu istemiyorsanız `-NoShortcuts` seçeneğini kullanın.
+
+Ana penceredeki **eksi** düğmesi uygulamayı sistem tepsisine gizler; hatırlatmalar ve sayaç çalışmaya devam eder. **×** düğmesi uygulamayı tamamen kapatır. Bir sonraki Windows oturumunda otomatik başlatma etkinse yeniden açılır. Daha erken açmak için masaüstü kısayolunu kullanabilirsiniz.
 
 ## Kaynak koddan çalıştırma
 
-Python 3.13+ ve uv kullanılır. Depoyu klonlayıp proje klasörüne geçin:
+Geliştirme için Git ve uv gerekir. Depoyu klonlayıp bağımlılıkları kurun; Python 3.13 bulunmuyorsa uv indirir:
 
 ```powershell
 git clone --branch dev https://github.com/dogukandincoguz/Odak.git
 cd Odak
+uv sync --locked --python 3.13
 ```
 
-Kurulum tamamlandıktan sonra masaüstündeki **Odak** kısayoluna çift tıklamak yeterlidir. Terminal açılmaz. Proje klasörünü taşımayın; kısayollar bu konumu kullanır. Taşınırsa aşağıdaki kurulum komutunu yeni konumda yeniden çalıştırın.
-
-Geliştirme ortamı ve bağımlılıklar:
+Uygulamayı doğrudan çalıştırmak için:
 
 ```powershell
-uv sync --locked
 uv run --locked python app.py
 ```
 
@@ -60,22 +73,24 @@ Masaüstü ve Windows başlangıç kısayollarını oluşturup uygulamayı açma
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -Launch
 ```
 
-Otomatik başlatmayı kapatmak için `Win+R` → `shell:startup` klasöründeki **Odak** kısayolunu kaldırın. Uygulama veya görev verileri silinmez.
+Kısayollar proje klasörünü kullanır. Klasörü taşırsanız `install.ps1` komutunu yeni konumda tekrar çalıştırın. Kaynak koddan çalıştırmada veriler varsayılan olarak projenin `data/` klasöründedir; yukarıdaki tek komutla kurulumun veri konumu farklıdır.
+
+Arayüz **PySide6-Essentials (Qt)** ile yazılmıştır; veriler **SQLite** içinde saklanır. Python ortamı ve bağımlılıklar **uv** ile yönetilir. Uygulama [Inter](assets/fonts/README.md) yazı tipini kendi dosyalarından yükler.
 
 ## Kullanım
 
 - **Yeni görev / Ctrl+N:** başlık zorunlu; not, tarih ve saat isteğe bağlıdır.
 - Yalnız tarih seçilirse o gün **23.59**; yalnız saat seçilirse **bugünün seçilen saati** kabul edilir.
-- Deadline'a **24 saatten az** kalan işler kırmızı, **24–72 saat** kalanlar sarıdır. Daha uzak veya deadlinesız görevler normal renktedir.
+- Deadline'a **24 saatten az** kalan işler kırmızı, **24–72 saat** kalanlar sarıdır. Daha uzak veya deadline'ı olmayan görevler normal renktedir.
 - Süresi dolan işler **Geçenler → Deadline’ı geçenler** bölümüne otomatik taşınır.
 - Tik simgesi görevi tamamlar; tamamlananlar **Bitenler** bölümünden yeniden açılabilir.
-- Silinen işler **Silinenler → Son silinenler** alanından **10 dakika** boyunca geri alınabilir. Süre uygulama kapalıyken de ilerler. Süre dolunca kalıcı olarak temizlenir.
-- Kalem simgesi başlığı, notu ve deadline'ı düzenler. **Ctrl+F** aramayı açar; arama seçili bölümde başlık ve notları tarar.
+- Silinen işler **Silinenler → Son silinenler** alanından **10 dakika** boyunca geri alınabilir. Süre uygulama kapalıyken de ilerler; süresi dolan kayıtlar uygulama çalışırken kalıcı olarak temizlenir.
+- Kalem simgesi başlığı, notu, deadline'ı ve alt adımları düzenler. **Görevler** bölümünde **Ctrl+F** arama alanına geçer; arama seçili listedeki başlık ve notları tarar.
 - Eksi düğmesi pencereyi sistem tepsisine gizler. Sağ alttaki tepsi simgesine tıklayarak veya sağ tık → **Odak’ı göster** ile pencereyi geri açabilirsiniz. Üç nokta menüsünden sağ üste yeniden yerleştirilebilir.
 - Pencereyi üstteki logo veya başlık alanından sol tıkla tutup sürükleyerek taşıyabilirsiniz. Konum kaydedilmez; her yeni açılışta yine sağ üst köşede başlar.
 - Kenarlardan veya sağ alt köşedeki tutamaktan pencereyi boyutlandırabilirsiniz. Boyut kaydedilir; sonraki açılışta bu boyutla sağ üstte açılır. Yeni görev, hatırlatma ve şablon pencereleri kendi üst barlarından taşınır; üstteki kutusuz `×` formu kapatır.
-- Uygulama birlikte gelen **Inter** yazı tipini kullanır; ayrıca font kurulumu gerekmez. Yazı tipi lisansı `assets/fonts/OFL.txt` içindedir.
-- `×` uygulamayı kapatır. Odak kısayolunu tekrar açmak var olan pencereyi öne getirir; ikinci kopya çalışmaz.
+- Uygulama birlikte gelen **Inter** yazı tipini kullanır; ayrıca font kurulumu gerekmez. Yazı tipi [SIL Open Font License 1.1](assets/fonts/OFL.txt) lisansıyla dağıtılır.
+- Odak kısayolunu tekrar açmak, aynı veri klasörünü kullanan mevcut pencereyi öne getirir; ikinci kopya çalışmaz.
 
 ## Günlük plan ve fikirler
 
@@ -96,43 +111,60 @@ Yeni görev penceresindeki **Şablon kullan** alanından hazır başlık, not ve
 Üstteki **Hatırlatmalar** bölümünden başlık, tekrar türü, tarih ve etkinlik saati seçin. Not ve toplantı bağlantısı isteğe bağlıdır.
 
 - **Haftalık:** haftanın birden çok günü, **Her gün** veya **Hafta içi**; 1–52 haftada bir tekrar. Başlangıç tarihinin haftası temel alınır; örneğin iki haftada bir pazartesi o haftadan başlayarak ilerler.
-- **Bir kez:** gelecekteki bir tarih ve saatte tek bildirim. Bildirimden sonra erteleme için kayıt geçici olarak kalır; etkinlikten veya son ertelemeden 24 saat sonra otomatik temizlenir. Eski tek seferlik kayıtlar birikmez.
+- **Bir kez:** gelecekteki bir tarih ve saatte tek bildirim. Bildirimden sonra erteleme için kayıt geçici olarak kalır; etkinlikten veya son ertelemeden 24 saat sonra uygulama çalışırken otomatik temizlenir. Eski tek seferlik kayıtlar birikmez.
 - **Aylık · belirli gün:** 1–31 veya **Ayın son günü**, 1–52 ayda bir. Seçilen günün bulunmadığı aylar atlanır; son gün seçimi şubat ve artık yılları takip eder.
 - **Aylık · haftanın belirli günü:** ilk, ikinci, üçüncü, dördüncü veya son pazartesi/cuma gibi bir gün; 1–52 ayda bir.
 - **Bildirim:** etkinlik saatinde veya 5, 10, 30 dakika önce. Örneğin 14.00 toplantısı için 10 dakika önce seçilirse 13.50'de haber verilir; 14.00'te ikinci bildirim oluşmaz. Kartta etkinlik saati ile bildirim tercihi ayrı görünür.
 - **Toplantıyı aç:** kaydedilmiş HTTP/HTTPS bağlantısını varsayılan tarayıcıda açar. Bağlantı hem karttan hem bildirime tıklayınca açılan pencereden kullanılabilir.
 
-- Her hatırlatma tek kayıttır; tekrarlarda yeni görev veya geçmiş kaydı üretilmez.
-- Zamanı gelince Windows bildirimi çıkar. Bildirime tıklayarak **10 dakika sonra hatırlat** seçebilirsiniz. Bu işlem düzenli programı değiştirmez.
+Her hatırlatma tek kayıttır; tekrarlarda yeni görev veya geçmiş kaydı üretilmez.
+
+- Bildirimlerin gelmesi için Odak açık olmalıdır; sistem tepsisine gizlenebilir. Windows bildirim ayarları izin verdiğinde zamanı gelince bildirim görünür. Bildirime tıklayarak **10 dakika sonra hatırlat** seçebilirsiniz. Bu işlem düzenli programı değiştirmez.
 - Düzenli hatırlatmalarda **Bu tekrarı atla**, sıradaki takvim zamanını atlar. **Duraklat / devam ettir** programı silmeden kapatıp açar. Tek seferlik hatırlatmanın tarihini düzenleyebilir veya kaydı silebilirsiniz.
 - Tamamlandı düğmesi bulunmaz; hatırlatmalar görev veya deadline'ı geçenler listelerine eklenmez.
 - Silinen hatırlatmalar bu bölümün sağındaki **Son silinenler** sekmesinden 10 dakika geri alınabilir.
-- Uygulama kapalıyken geçen eski bildirimler birikmez. Açılışta son 15 dakikada gelen veya etkinliği henüz başlamamış bir hatırlatma gösterilebilir; daha eskileri sonraki takvim zamanına ilerler. Yeni hatırlatmanın ön bildirim saati geçmişse ve etkinlik hâlâ gelecekteyse hemen haber verilir.
+- Uygulama kapalıyken geçen eski bildirimler birikmez. Açılışta bildirim saati son 15 dakika içinde geçmiş olan veya bildirim saati geçmiş olsa da etkinliği henüz başlamamış bir hatırlatma gösterilebilir. Daha eski düzenli hatırlatmalar sonraki takvim zamanına ilerler. Yeni hatırlatmanın ön bildirim saati geçmişse ve etkinlik hâlâ gelecekteyse hemen haber verilir.
 
 ## Odak sayacı
 
 Üstteki **Odaklan** bölümünden görev seçin veya **Serbest odak** kullanın. Varsayılan süreler 25 dakika çalışma ve 5 dakika moladır; değiştirilebilir. Başlatma, duraklatma ve sıfırlama desteklenir. Süre bitince bildirim gelir; sonraki çalışma veya mola süresini kendiniz başlatırsınız. Görevler otomatik tamamlanmaz.
 
-Sayaç tepsiye gizlendiğinde çalışır ve açılışlar arasında durumunu korur. Yalnızca ayarlar ve geçerli sayaç durumu tutulur; oturum geçmişi biriktirilmez.
+Sayaç tepsiye gizlendiğinde çalışır ve açılışlar arasında durumunu korur. Uygulama kapalıyken bildirim vermez; yeniden açıldığında geçen süreyi hesaba katar. Yalnızca ayarlar ve geçerli sayaç durumu tutulur; oturum geçmişi biriktirilmez.
 
 ## Yedekleme ve aktarım
 
 Üç nokta menüsünden:
 
-- **Dışa aktar:** görevleri, adımları, günlük sıralamayı, hatırlatma kurallarını ve şablonları taşınabilir JSON dosyasına kaydeder.
+- **Dışa aktar:** görevleri, adımları, günlük sıralamayı, hatırlatma kurallarını ve şablonları taşınabilir JSON dosyasına kaydeder. Pencere ve sayaç ayarları JSON'a dahil edilmez.
 - **İçe aktar:** JSON'daki yeni kayıtları ekler. Aynı kimlikli mevcut kayıtları değiştirmez.
 - **Şimdi yedek al:** veritabanının güvenli anlık kopyasını alır.
 - **Yedekten geri yükle:** mevcut verileri seçilen yedekle değiştirir; işlem öncesi mevcut durumun yedeği alınır.
 
-Uygulama açıkken günlük otomatik yedek alınır. **data/backups** altında en fazla **3 yedek** tutulur; otomatik ve elle alınan kopyalar aynı sınıra dahildir. Bildirim geçmişi, sayaç oturum geçmişi veya ek dosyalar saklanmadığı için büyüme esas olarak yazdığınız metin ve alt adımlara bağlıdır.
+Uygulama açıkken günlük otomatik yedek alınır. Kullanılan veri klasörünün **backups/** alt klasöründe en fazla **3 yedek** tutulur. Tek komutla kurulumda konumu `%LOCALAPPDATA%\Odak\data\backups`, kaynak koddan çalıştırmada `proje/data/backups` olur. Otomatik, elle ve güncelleme sırasında alınan kopyalar aynı sınıra dahildir. Bildirim geçmişi, sayaç oturum geçmişi veya ek dosyalar saklanmadığı için büyüme esas olarak yazdığınız metin ve alt adımlara bağlıdır.
 
 Örnek ölçümde, her biri 500 bayt not içeren 3.650 görev yaklaşık 2,7 MB; 36.500 görev yaklaşık 27 MB yer kapladı. Her göreve ayrıca beş alt adım eklendiğinde boyutlar sırasıyla yaklaşık 6,6 MB ve 65,6 MB oldu. Daha uzun metinler bu boyutu artırır. Üç tam yedek yaklaşık üç ek veritabanı kadar alan kullanır. Bu ölçümler bir boyut garantisi değildir.
 
 ## Veriler
 
-Görevler, hatırlatmalar ve şablonlar her değişiklikte yerel SQLite veritabanına kaydedilir. Tek komutla kurulumda dosya **%LOCALAPPDATA%\Odak\data\odak.sqlite3**, kaynak koddan çalıştırmada **proje/data/odak.sqlite3** konumundadır. Kısayolun `--data-dir` argümanı kullanılan veri klasörünü gösterir. Veri tamamen bu bilgisayarda kalır. Elle klasör yedeği almak için uygulamayı kapatıp veri klasörünü kopyalayın veya uygulamadaki yedekleme menüsünü kullanın. Eski sürümün görevleri ilk açılışta yeni alanlar eklenerek korunur. Uygulamayı kaldırmak isterseniz önce verilerinizi yedekleyin. Hata kayıtları aynı veri klasöründeki `odak.log` dosyasındadır.
+Görevler, hatırlatmalar, şablonlar ve ayarlar her değişiklikte yerel SQLite veritabanına kaydedilir. Varsayılan konumlar:
+
+| Dosya veya klasör | Tek komutla kurulum | Kaynak koddan çalıştırma |
+| --- | --- | --- |
+| Veritabanı | `%LOCALAPPDATA%\Odak\data\odak.sqlite3` | `proje/data/odak.sqlite3` |
+| Yedekler | `%LOCALAPPDATA%\Odak\data\backups` | `proje/data/backups` |
+| Hata kaydı | `%LOCALAPPDATA%\Odak\data\odak.log` | `proje/data/odak.log` |
+
+Özel bir veri klasörü seçtiyseniz kısayolun `--data-dir` argümanı kullanılan konumu gösterir. Uygulama görev verilerini bir sunucuya göndermez. Dışa aktardığınız JSON dosyaları ve veritabanı yedekleri görevlerinizi, notlarınızı ve toplantı bağlantılarınızı içerir; bunları paylaşmadan önce içeriğini kontrol edin.
+
+Elle klasör yedeği almak için uygulamayı kapatıp veri klasörünün tamamını kopyalayın veya uygulamadaki yedekleme menüsünü kullanın. Eski sürümün görevleri ilk açılışta yeni alanlar eklenerek korunur.
 
 Deadline'lar bilgisayarın yerel saatine göre değerlendirilir. Otomatik başlatma, Windows hesabına girişte gerçekleşir. Windows'un güvenli masaüstü ve özel tam ekran uygulamaları normal pencere sıralamasını geçersiz kılabilir.
+
+## Kaldırma
+
+Önce verilerinizi yedekleyip Odak'ı kapatın. Masaüstündeki ve `Win+R` → `shell:startup` klasöründeki **Odak** kısayollarını kaldırın. Tek komutla kurduysanız `%LOCALAPPDATA%\Programs\Odak` klasörünü silebilirsiniz; kaynak koddan çalıştırıyorsanız proje klasöründe varsayılan olarak verilerinizin de bulunduğunu unutmayın.
+
+Tek komutla kurulumun veri klasörü uygulama klasöründen ayrıdır. Görevlerinizi saklamak istiyorsanız `%LOCALAPPDATA%\Odak\data` klasörünü koruyun. Özel kurulum veya veri konumu seçtiyseniz kendi klasörlerinizi esas alın.
 
 ## Kontrol
 
