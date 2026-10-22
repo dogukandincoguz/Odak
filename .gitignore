@@ -4,3 +4,17 @@ __pycache__/
 data/
 artifacts/
 *.pyc
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+*.db
+*.log
+*.pem
+*.key
+*.pfx
+*.p12
+*.lnk
+.odak-install.json
+.install.lock

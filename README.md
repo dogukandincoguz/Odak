@@ -2,12 +2,46 @@
 
 Windows açılışında sağ üstte başlayan, diğer normal pencerelerin üzerinde duran yerel görev takipçisi. Görev çubuğunda görünmez; simgesi sağ alttaki sistem tepsisindedir. İnternet veya hesap gerektirmez. Kapatma düğmesi uygulamayı tamamen kapatır; sonraki Windows oturumunda yeniden açılır.
 
-## Çalıştırma
+## Tek komutla kurulum ve güncelleme
+
+Windows PowerShell 5.1 veya PowerShell 7'de:
+
+```powershell
+irm https://raw.githubusercontent.com/dogukandincoguz/Odak/dev/bootstrap.ps1 | iex
+```
+
+Git, Python veya yönetici yetkisi gerekmez. Betik `dev` branch'inin o anki commitini indirir; uv yoksa [resmi Astral kurucusuyla](https://docs.astral.sh/uv/getting-started/installation/) kullanıcıya özel kurar. Python 3.13 yoksa uv üzerinden indirir; bağımlılıkları `uv.lock` ile kurar. Masaüstü ve Windows başlangıç kısayollarını oluşturup Odak'ı açar. Aynı komut tekrar çalıştırıldığında günceller.
+
+- Uygulama dosyaları: `%LOCALAPPDATA%\Programs\Odak`
+- Görevler, ayarlar ve yedekler: `%LOCALAPPDATA%\Odak\data`
+- Otomatik indirilen uv: `%LOCALAPPDATA%\Programs\Odak-Tools\uv`; var olan uv varsa kullanılır.
+
+Uygulama ve veriler ayrı tutulur. Güncelleme öncesi veri yedeği alınır; son üç yedek korunur. Açık Odak normal biçimde kapatılır; kaydedilmemiş bir form varsa kurulum durur ve formu kaydetmeniz istenir. Ortam doğrulaması başarısız olursa önceki uygulama dosyaları geri konur; aynı komutla yeniden denenebilir. Hedef klasörün boş veya bu betikle yönetilen bir Odak kurulumu olması gerekir.
+
+Eski yerel kurulumdan ilk geçişte mevcut masaüstü kısayolunun veri klasörü bulunur. Yeni veri klasörü boşsa SQLite'ın yedekleme API'siyle kopyalanır; eski veri dosyası korunur. Yeni konumda zaten veritabanı varsa eski kopyayla değiştirilmez.
+
+`irm | iex` bağlantıdaki PowerShell kodunu doğrudan çalıştırır. Çalıştırılacak dosya [bootstrap.ps1](bootstrap.ps1) içinde incelenebilir. Public repo için yukarıdaki komut giriş gerektirmez. Gizli repo için içerik okuma yetkili GitHub token'ı gerekir; token komut geçmişine yazılmadan alınabilir:
+
+```powershell
+$odakSecret = Read-Host 'GitHub token' -AsSecureString
+$odakToken = [Net.NetworkCredential]::new('', $odakSecret).Password
+try {
+    $odakHeaders = @{ Authorization = 'Bearer ' + $odakToken; Accept = 'application/vnd.github.raw+json' }
+    $odakScript = irm 'https://api.github.com/repos/dogukandincoguz/Odak/contents/bootstrap.ps1?ref=dev' -Headers $odakHeaders
+    & ([ScriptBlock]::Create($odakScript)) -GitHubToken $odakToken
+} finally {
+    Remove-Variable odakToken, odakSecret, odakHeaders, odakScript -ErrorAction SilentlyContinue
+}
+```
+
+Kurulum dosyası indirildikten sonra `-InstallDir`, `-DataDir`, `-Ref`, `-NoLaunch` ve `-NoShortcuts` parametreleri de kullanılabilir. Aynı kuruluma ait veri klasörü kurulum kaydından hatırlanır. Yönetici olarak açmak veya sistemin kalıcı execution policy ayarını değiştirmek gerekmez.
+
+## Kaynak koddan çalıştırma
 
 Python 3.13+ ve uv kullanılır. Depoyu klonlayıp proje klasörüne geçin:
 
 ```powershell
-git clone https://github.com/dogukandincoguz/Odak.git
+git clone --branch dev https://github.com/dogukandincoguz/Odak.git
 cd Odak
 ```
 
@@ -96,7 +130,7 @@ Uygulama açıkken günlük otomatik yedek alınır. **data/backups** altında e
 
 ## Veriler
 
-Tüm görevler ve düzenli hatırlatmalar proje içindeki **data/odak.sqlite3** dosyasına her değişiklikte kaydedilir. Veri tamamen bu bilgisayarda kalır. Elle klasör yedeği almak için uygulamayı kapatıp **data** klasörünü kopyalayın veya uygulamadaki yedekleme menüsünü kullanın. Eski sürümün görevleri ilk açılışta yeni alanlar eklenerek korunur. Uygulamayı kaldırmak isterseniz önce verilerinizi yedekleyin. Hata kayıtları `data/odak.log` dosyasındadır.
+Görevler, hatırlatmalar ve şablonlar her değişiklikte yerel SQLite veritabanına kaydedilir. Tek komutla kurulumda dosya **%LOCALAPPDATA%\Odak\data\odak.sqlite3**, kaynak koddan çalıştırmada **proje/data/odak.sqlite3** konumundadır. Kısayolun `--data-dir` argümanı kullanılan veri klasörünü gösterir. Veri tamamen bu bilgisayarda kalır. Elle klasör yedeği almak için uygulamayı kapatıp veri klasörünü kopyalayın veya uygulamadaki yedekleme menüsünü kullanın. Eski sürümün görevleri ilk açılışta yeni alanlar eklenerek korunur. Uygulamayı kaldırmak isterseniz önce verilerinizi yedekleyin. Hata kayıtları aynı veri klasöründeki `odak.log` dosyasındadır.
 
 Deadline'lar bilgisayarın yerel saatine göre değerlendirilir. Otomatik başlatma, Windows hesabına girişte gerçekleşir. Windows'un güvenli masaüstü ve özel tam ekran uygulamaları normal pencere sıralamasını geçersiz kılabilir.
 
@@ -124,3 +158,12 @@ uv run --locked python tools/check_features.py
 ```
 
 Bu kontrol fareyi birkaç saniye hareket ettirir; gerçek görev verilerini kullanmaz.
+
+Tek komutla kurulumu gerçek PowerShell 5.1, geçici program/veri klasörleri ve ayrı test kısayollarıyla kontrol etmek için:
+
+```powershell
+uv run --locked python tools/check_bootstrap.py --clean-runtime
+uv run --locked python tools/check_bootstrap.py --powershell-seven
+```
+
+İlk komut uv ve Python'un bulunmadığı durumu da dener. Testler mevcut görevleri veya masaüstü/başlangıç kısayollarını değiştirmez; bağımlılık indirmeleri için internet gerekir.
