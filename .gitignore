@@ -18,3 +18,8 @@ artifacts/
 *.lnk
 .odak-install.json
 .install.lock
+
+# Local security notes; keep audit reports under artifacts/.
+/SECURITY*.md
+/security*.md
+/docs/security/

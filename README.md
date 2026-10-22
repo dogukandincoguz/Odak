@@ -7,24 +7,26 @@ Windows için görev, hatırlatma ve odak sayacı uygulaması. Windows hesabın�
 Windows PowerShell 5.1 veya PowerShell 7'yi açıp şu komutu çalıştırın:
 
 ```powershell
-irm https://raw.githubusercontent.com/dogukandincoguz/Odak/dev/bootstrap.ps1 | iex
+irm https://raw.githubusercontent.com/dogukandincoguz/Odak/c5abd8963c4c7dfe6c5539a21ce88e21633c1c02/bootstrap.ps1 | iex
 ```
 
 Önceden Git veya Python kurmanız gerekmez; yönetici yetkisi, GitHub hesabı veya token da istenmez. **Kurulum ve güncelleme için internet bağlantısı gerekir.**
 
-Betik, geliştirmelerin yayımlandığı **`dev` dalının** o anki commitini indirir. uv yoksa [resmi Astral kurucusuyla](https://docs.astral.sh/uv/getting-started/installation/) kullanıcıya özel kurar; Python 3.13 yoksa uv üzerinden indirir. Bağımlılıkları `uv.lock` dosyasındaki sürümlerle kurar, masaüstü ve Windows başlangıç kısayollarını oluşturur ve Odak'ı açar.
+Kurulum komutu ve indirilecek uygulama **sabit commitlere bağlıdır**; `dev` veya `main` dalındaki sonraki değişiklikleri kendiliğinden almaz. Betik, uygulama arşivindeki dosya adlarını ve içeriklerini beklenen SHA-256 değeriyle doğrular. Eşleşmezse uygulama dosyalarını ve verileri değiştirmeden durur.
 
-Kurulumdan sonra masaüstündeki **Odak** kısayolunu kullanabilirsiniz; terminal penceresi açılmaz. **Güncellemek için aynı komutu yeniden çalıştırın.** Uygulama güncellemeleri kendiliğinden indirmez.
+uv yoksa [resmi uv 0.13.5 sürüm paketini](https://github.com/astral-sh/uv/releases/tag/0.13.5) indirir; ZIP'i ve `uv.exe` dosyasını ayrı SHA-256 değerleriyle doğruladıktan sonra kullanıcıya özel kurar. Üçüncü taraf bir PowerShell kurucusu çalıştırmaz. Python 3.13 yoksa uv üzerinden indirir. Bağımlılıkları `uv.lock` dosyasındaki sürümlerle kurar, masaüstü ve Windows başlangıç kısayollarını oluşturur ve Odak'ı açar.
+
+Kurulumdan sonra masaüstündeki **Odak** kısayolunu kullanabilirsiniz; terminal penceresi açılmaz. **Yeni sürüme geçmek için README'deki güncel kurulum komutunu kullanın.** Önceden kaydettiğiniz komut aynı sürümü yeniden kurar; uygulama güncellemeleri kendiliğinden indirmez.
 
 - Uygulama dosyaları: `%LOCALAPPDATA%\Programs\Odak`
 - Görevler, ayarlar ve yedekler: `%LOCALAPPDATA%\Odak\data`
-- Otomatik indirilen uv: `%LOCALAPPDATA%\Programs\Odak-Tools\uv`; var olan uv varsa kullanılır.
+- Otomatik indirilen uv: `%LOCALAPPDATA%\Programs\Odak-Tools\uv\0.13.5\<mimari>`; PATH üzerinde zaten uv varsa mevcut kurulum kullanılır.
 
 Uygulama ve veriler ayrı tutulur. Güncelleme öncesi veri yedeği alınır; son üç yedek korunur. Açık Odak normal biçimde kapatılır. Açık bir form veya devam eden bir işlem varsa kurulum durur; formu kaydedip veya kapatıp yeniden deneyin. Ortam doğrulaması başarısız olursa önceki uygulama dosyaları geri konur; aynı komutla yeniden denenebilir. Hedef klasörün boş veya bu betikle yönetilen bir Odak kurulumu olması gerekir.
 
 Eski kaynak kod kurulumundan ilk geçişte mevcut masaüstü kısayolunun veri klasörü bulunur. Yeni konumda henüz veritabanı yoksa eski veritabanı SQLite'ın yedekleme API'siyle kopyalanır; eski veri dosyası korunur. Yeni konumda zaten veritabanı varsa eski kopyayla değiştirilmez.
 
-`irm | iex` bağlantıdaki PowerShell kodunu indirip doğrudan çalıştırır. Kurulum betiğini çalıştırmadan önce [buradan inceleyebilirsiniz](https://github.com/dogukandincoguz/Odak/blob/dev/bootstrap.ps1).
+`irm | iex` bağlantıdaki PowerShell kodunu indirip doğrudan çalıştırır. Çalıştırılacak sabit sürümü [buradan inceleyebilirsiniz](https://github.com/dogukandincoguz/Odak/blob/c5abd8963c4c7dfe6c5539a21ce88e21633c1c02/bootstrap.ps1).
 
 Kurulum betiğini dosya olarak indirip çalıştırırken aşağıdaki seçenekler kullanılabilir:
 
@@ -32,14 +34,15 @@ Kurulum betiğini dosya olarak indirip çalıştırırken aşağıdaki seçenekl
 | --- | --- |
 | `-InstallDir` | Uygulamanın kurulacağı klasörü seçer. |
 | `-DataDir` | Verilerin saklanacağı klasörü seçer; uygulama klasöründen ayrı olmalıdır. |
-| `-Ref` | İndirilecek Git dalını, etiketini veya commitini seçer; varsayılan `dev` değeridir. |
+| `-Ref` | Uygulama sürümünü seçer; varsayılan `13598e705eb974765e218f9b159c721e53645f24` commitidir. Farklı bir kaynak için `-SourceSha256` da gerekir. |
+| `-SourceSha256` | Farklı bir kaynağın önceden incelenmiş dosya adları ve içeriklerine ait SHA-256 değerini belirtir. |
 | `-NoLaunch` | Kurulum sonunda uygulamayı açmaz. |
 | `-NoShortcuts` | Masaüstü ve Windows başlangıç kısayollarını oluşturmaz veya değiştirmez. |
 
 Örneğin, kısayollara dokunmadan kurmak veya güncellemek için:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/dogukandincoguz/Odak/dev/bootstrap.ps1' -OutFile .\odak-bootstrap.ps1
+Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/dogukandincoguz/Odak/c5abd8963c4c7dfe6c5539a21ce88e21633c1c02/bootstrap.ps1' -OutFile .\odak-bootstrap.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\odak-bootstrap.ps1 -NoShortcuts
 ```
 

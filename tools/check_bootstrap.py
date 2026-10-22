@@ -16,6 +16,7 @@ from pathlib import Path
 PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(PROJECT))
 from odak.model import Store
+from tools.source_digest import zip_digest
 
 
 def main():
@@ -46,7 +47,8 @@ def main():
                 UV_PYTHON_INSTALL_DIR=str(temporary/"managed-python"),
                 UV_PYTHON_BIN_DIR=str(temporary/"python-bin"), UV_PYTHON_PREFERENCE="only-managed")
         command=[str(powershell),"-NoProfile","-ExecutionPolicy","Bypass","-File",str(PROJECT/"bootstrap.ps1"),
-            "-SourceArchive",str(archive),"-InstallDir",str(target),"-DataDir",str(data),"-NoLaunch","-NoShortcuts"]
+            "-SourceArchive",str(archive),"-SourceSha256",zip_digest(archive),
+            "-InstallDir",str(target),"-DataDir",str(data),"-NoLaunch","-NoShortcuts"]
         subprocess.run(command,cwd=PROJECT,env=environment,check=True)
         marker=json.loads((target/".odak-install.json").read_text(encoding="utf-8"))
         assert marker["format"]=="odak-install-v1"
@@ -82,15 +84,15 @@ Write-Output 'Desktop and Startup shortcut arguments verified.'
             "-Application",str(target),"-Data",str(data),"-DesktopTarget",str(desktop),"-StartupTarget",str(startup)],check=True)
         # The same bytes must work through Invoke-Expression, without PSScriptRoot.
         pipeline_wrapper=temporary/"check-iex.ps1"
-        pipeline_wrapper.write_text('''param([string]$Bootstrap,[string]$Archive,[string]$Application,[string]$Data)
+        pipeline_wrapper.write_text('''param([string]$Bootstrap,[string]$Archive,[string]$SourceHash,[string]$Application,[string]$Data)
 $ErrorActionPreference = 'Stop'
-$arguments = @{ SourceArchive=$Archive; InstallDir=$Application; DataDir=$Data; NoLaunch=$true; NoShortcuts=$true }
+$arguments = @{ SourceArchive=$Archive; SourceSha256=$SourceHash; InstallDir=$Application; DataDir=$Data; NoLaunch=$true; NoShortcuts=$true }
 $script = Get-Content -LiteralPath $Bootstrap -Raw -Encoding UTF8
 Invoke-Expression ('& {' + [Environment]::NewLine + $script + [Environment]::NewLine + '} @arguments')
 if (-not (Test-Path -LiteralPath (Join-Path $Application '.odak-install.json'))) { throw 'Missing install marker.' }
 ''',encoding="utf-8")
         subprocess.run([str(powershell),"-NoProfile","-ExecutionPolicy","Bypass","-File",str(pipeline_wrapper),
-            "-Bootstrap",str(PROJECT/"bootstrap.ps1"),"-Archive",str(archive),"-Application",str(target),"-Data",str(data)],
+            "-Bootstrap",str(PROJECT/"bootstrap.ps1"),"-Archive",str(archive),"-SourceHash",zip_digest(archive),"-Application",str(target),"-Data",str(data)],
             cwd=temporary,env=environment,check=True)
     print("PowerShell bootstrap check: install, update, Invoke-Expression, Unicode paths, data preservation and isolated shortcuts OK.")
 
