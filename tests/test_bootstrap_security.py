@@ -34,8 +34,14 @@ foreach ($definition in $definitions) { Invoke-Expression $definition.Extent.Tex
 switch ($Mode) {
     'source' { Get-OdakSourceHash $Archive }
     'uv' { Install-OdakUv $Archive $Expected $Expected $Destination }
-    'cache' {
-        function Get-Command { return $null }
+    { $_ -in @('cache', 'old') } {
+        if ($Mode -eq 'old') {
+            $fakeUv = Join-Path $workPath 'old-uv.cmd'
+            [IO.File]::WriteAllText($fakeUv, "@echo off`r`necho uv 0.12.5`r`n")
+            function Get-Command { return [pscustomobject]@{ Source=$fakeUv } }
+        } else {
+            function Get-Command { return $null }
+        }
         function Invoke-WebRequest { throw 'Unexpected download.' }
         $env:PROCESSOR_ARCHITECTURE = 'AMD64'
         $env:PROCESSOR_ARCHITEW6432 = ''
@@ -139,10 +145,12 @@ switch ($Mode) {
 
     def test_tampered_cached_uv_is_rejected_without_a_download(self):
         for shell in self.shells:
-            result = self.verify(shell, mode="cache")
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(b"SHA-256", result.stderr)
-            self.assertNotIn(b"Unexpected download", result.stderr)
+            for mode in ("cache", "old"):
+                with self.subTest(shell=shell, mode=mode):
+                    result = self.verify(shell, mode=mode)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(b"SHA-256", result.stderr)
+                    self.assertNotIn(b"Unexpected download", result.stderr)
 
     def test_missing_or_wrong_source_hash_never_touches_install_or_data(self):
         self.archive_entries([("Odak-root/app.py", b"untrusted")])

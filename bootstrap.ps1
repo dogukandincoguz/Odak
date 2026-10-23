@@ -103,7 +103,12 @@ param(
 
     function Get-OdakUv {
         $command = Get-Command uv.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($command) { return $command.Source }
+        if ($command) {
+            $installedVersion = & $command.Source --version
+            if ($LASTEXITCODE -eq 0 -and $installedVersion -match '^uv (\d+\.\d+\.\d+)(?:\s|$)') {
+                if ([version]$Matches[1] -ge [version]'0.13.5') { return $command.Source }
+            }
+        }
         $version = '0.13.5'
         $architecture = $env:PROCESSOR_ARCHITECTURE
         if ($env:PROCESSOR_ARCHITEW6432) { $architecture = $env:PROCESSOR_ARCHITEW6432 }
