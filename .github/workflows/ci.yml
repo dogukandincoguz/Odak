@@ -80,6 +80,9 @@ jobs:
         run: uv run --locked python -m unittest discover -s tests -v
       - name: Check installer syntax
         run: sh -n install.sh
+      - name: Check native macOS window and Dock
+        if: runner.os == 'macOS'
+        run: uv run --locked python tools/check_macos.py
 
   gitleaks:
     name: Gitleaks

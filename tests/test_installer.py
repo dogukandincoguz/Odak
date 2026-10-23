@@ -96,6 +96,16 @@ class InstallerTests(unittest.TestCase):
         for relative in ("../outside.py","odak/../../outside.py","data/odak.sqlite3",".git/config",".venv/file","C:/outside.py"):
             with self.assertRaises(ValueError):managed_path(self.target,relative)
 
+    @unittest.skipIf(os.name == "nt", "Unix symlink fixture")
+    def test_arbitrary_symlink_parent_cannot_redirect_an_install(self):
+        outside = self.root / "outside"
+        outside.mkdir()
+        link = self.root / "redirect"
+        link.symlink_to(outside, target_is_directory=True)
+        with self.assertRaises(ValueError):
+            install(self.source, link / "application", self.data, "uv", "v1", "dev")
+        self.assertEqual(list(outside.iterdir()), [])
+
     def test_migration_copies_sqlite_wal_and_existing_destination_wins(self):
         legacy=self.root/"legacy"
         store=Store(legacy/"odak.sqlite3")

@@ -206,9 +206,19 @@ print('Odak calisma ortami dogrulandi.')
 """
 
 
+def _system_path(path: Path) -> Path:
+    # macOS exposes these root-owned system aliases; arbitrary user links stay forbidden.
+    if sys.platform == "darwin":
+        for alias in (Path("/var"), Path("/tmp"), Path("/etc")):
+            destination = Path("/private") / alias.name
+            if path.is_relative_to(alias) and alias.is_symlink() and alias.lstat().st_uid == 0 and alias.resolve() == destination:
+                return destination / path.relative_to(alias)
+    return path
+
+
 def install(source: Path, target: Path, data: Path, uv: str, revision: str, ref: str,
             legacy: Path | None = None, no_launch=False, no_shortcuts=False):
-    source, target, data = source.resolve(), target.absolute(), data.absolute()
+    source, target, data = source.resolve(), _system_path(target.absolute()), _system_path(data.absolute())
     if target == Path(target.anchor) or data == Path(data.anchor) or source == target:
         raise ValueError("Kurulum ve veri klasörleri geçersiz.")
     if any(p.is_symlink() or p.is_junction() for p in [target, *target.parents, data, *data.parents]):
