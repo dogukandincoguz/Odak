@@ -3,7 +3,7 @@
 param(
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'Programs\Odak'),
     [string]$DataDir = '',
-    [string]$Ref = '13598e705eb974765e218f9b159c721e53645f24',
+    [string]$Ref = '2f60dd3730bc2ce739c6c6f29a38bf56afb76027',
     [ValidatePattern('^$|^[a-fA-F0-9]{64}$')]
     [string]$SourceSha256 = '',
     [string]$GitHubToken = $env:ODAK_GITHUB_TOKEN,
@@ -160,10 +160,10 @@ param(
 
     try {
         if (-not $SourceSha256) {
-            if ($SourceArchive -or $Ref -ne '13598e705eb974765e218f9b159c721e53645f24') {
+            if ($SourceArchive -or $Ref -ne '2f60dd3730bc2ce739c6c6f29a38bf56afb76027') {
                 throw 'Farkli kaynak icin guvenilir bir -SourceSha256 degeri gerekli.'
             }
-            $SourceSha256 = '74f010226390c0de4fec866408232b9f5c02f7e262912112f32335b2bed7bee1'
+            $SourceSha256 = 'd2cf9f1349e2fa06bbf6ddd1e12dfbf511b853f0b424818ec71a427de00e73ff'
         }
         $InstallDir = [IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($InstallDir))
         $marker = Join-Path $InstallDir '.odak-install.json'
