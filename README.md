@@ -7,7 +7,7 @@ Windows, Linux ve macOS için görev, hatırlatma ve odak sayacı uygulaması. O
 Windows PowerShell 5.1 veya PowerShell 7'yi açıp şu komutu çalıştırın:
 
 ```powershell
-irm https://raw.githubusercontent.com/dogukandincoguz/Odak/d26e75cffa0155e44360ca3505c2ca3afe753a58/bootstrap.ps1 | iex
+irm https://raw.githubusercontent.com/dogukandincoguz/Odak/821aa266abfb0fd4de50a63af31fc6494b68c934/bootstrap.ps1 | iex
 ```
 
 Önceden Git veya Python kurmanız gerekmez; yönetici yetkisi, GitHub hesabı veya token da istenmez. **Kurulum ve güncelleme için internet bağlantısı gerekir.**
@@ -26,7 +26,7 @@ Uygulama ve veriler ayrı tutulur. Güncelleme öncesi veri yedeği alınır; so
 
 Eski kaynak kod kurulumundan ilk geçişte mevcut masaüstü kısayolunun veri klasörü bulunur. Yeni konumda henüz veritabanı yoksa eski veritabanı SQLite'ın yedekleme API'siyle kopyalanır; eski veri dosyası korunur. Yeni konumda zaten veritabanı varsa eski kopyayla değiştirilmez.
 
-`irm | iex` bağlantıdaki PowerShell kodunu indirip doğrudan çalıştırır. Çalıştırılacak sabit sürümü [buradan inceleyebilirsiniz](https://github.com/dogukandincoguz/Odak/blob/d26e75cffa0155e44360ca3505c2ca3afe753a58/bootstrap.ps1).
+`irm | iex` bağlantıdaki PowerShell kodunu indirip doğrudan çalıştırır. Çalıştırılacak sabit sürümü [buradan inceleyebilirsiniz](https://github.com/dogukandincoguz/Odak/blob/821aa266abfb0fd4de50a63af31fc6494b68c934/bootstrap.ps1).
 
 Kurulum betiğini dosya olarak indirip çalıştırırken aşağıdaki seçenekler kullanılabilir:
 
@@ -34,7 +34,7 @@ Kurulum betiğini dosya olarak indirip çalıştırırken aşağıdaki seçenekl
 | --- | --- |
 | `-InstallDir` | Uygulamanın kurulacağı klasörü seçer. |
 | `-DataDir` | Verilerin saklanacağı klasörü seçer; uygulama klasöründen ayrı olmalıdır. |
-| `-Ref` | Uygulama sürümünü seçer; varsayılan `2f60dd3730bc2ce739c6c6f29a38bf56afb76027` commitidir. Farklı bir kaynak için `-SourceSha256` da gerekir. |
+| `-Ref` | Uygulama sürümünü seçer; varsayılan `ae50f29bc22fd500836f6c6189b903d97dee0967` commitidir. Farklı bir kaynak için `-SourceSha256` da gerekir. |
 | `-SourceSha256` | Farklı bir kaynağın önceden incelenmiş dosya adları ve içeriklerine ait SHA-256 değerini belirtir. |
 | `-NoLaunch` | Kurulum sonunda uygulamayı açmaz. |
 | `-NoShortcuts` | Masaüstü ve Windows başlangıç kısayollarını oluşturmaz veya değiştirmez. |
@@ -42,7 +42,7 @@ Kurulum betiğini dosya olarak indirip çalıştırırken aşağıdaki seçenekl
 Örneğin, kısayollara dokunmadan kurmak veya güncellemek için:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/dogukandincoguz/Odak/d26e75cffa0155e44360ca3505c2ca3afe753a58/bootstrap.ps1' -OutFile .\odak-bootstrap.ps1
+Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/dogukandincoguz/Odak/821aa266abfb0fd4de50a63af31fc6494b68c934/bootstrap.ps1' -OutFile .\odak-bootstrap.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\odak-bootstrap.ps1 -NoShortcuts
 ```
 
