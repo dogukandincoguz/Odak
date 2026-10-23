@@ -94,6 +94,7 @@ class FileDialog(QFileDialog):
     def __init__(self, parent, title, location, pattern):
         super().__init__(parent, title, location, pattern)
         self.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)
         self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint |
                             Qt.WindowType.WindowStaysOnTopHint)
         self.setObjectName("fileDialog")
@@ -111,6 +112,7 @@ class StyledDialog(QDialog):
         super().__init__(parent, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint |
                          Qt.WindowType.WindowStaysOnTopHint)
         self.setWindowTitle(title)
+        self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)
         self.setObjectName("styledDialog")
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setModal(True)

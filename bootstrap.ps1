@@ -130,7 +130,7 @@ param(
         # --system avoids choosing the environment that is being updated.
         $startInfo = New-Object Diagnostics.ProcessStartInfo
         $startInfo.FileName = $UvPath
-        $startInfo.Arguments = 'python find --system 3.13'
+        $startInfo.Arguments = 'python find --system 3.15.1'
         $startInfo.UseShellExecute = $false
         $startInfo.CreateNoWindow = $true
         $startInfo.RedirectStandardOutput = $true
@@ -146,11 +146,11 @@ param(
                 if ($process.ExitCode -eq 0 -and (Test-Path -LiteralPath $found -PathType Leaf)) { return $found }
             } finally { $process.Dispose() }
             if ($attempt -eq 0) {
-                Write-Host 'Python 3.13 uv ile kuruluyor...'
-                Invoke-OdakCommand $UvPath @('python', 'install', '3.13') | Out-Host
+                Write-Host 'Python 3.15.1 uv ile kuruluyor...'
+                Invoke-OdakCommand $UvPath @('python', 'install', '3.15.1') | Out-Host
             }
         }
-        throw 'Python 3.13 bulunamadi.'
+        throw 'Python 3.15.1 bulunamadi.'
     }
 
     try {

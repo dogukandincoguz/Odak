@@ -20,7 +20,9 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 FORMAT = "odak-install-v1"
-ROOT_FILES = {"app.py", "bootstrap.ps1", "install.ps1", "pyproject.toml", "uv.lock", "README.md"}
+ROOT_FILES = {"app.py", "bootstrap.ps1", "install.ps1", "install.sh", ".python-version",
+              "pyproject.toml", "uv.lock", "README.md"}
+TOOL_FILES = {"tools/install_state.py", "tools/install_desktop.py"}
 MARKER = ".odak-install.json"
 
 
@@ -28,7 +30,7 @@ def managed_path(root: Path, relative: str) -> Path:
     parts = PurePosixPath(relative.replace("\\", "/"))
     if parts.is_absolute() or ".." in parts.parts or not parts.parts:
         raise ValueError("Kurulum dosya yolu geçersiz.")
-    if not (str(parts) in ROOT_FILES or parts.parts[0] in ("odak", "assets") or str(parts) == "tools/install_state.py"):
+    if not (str(parts) in ROOT_FILES or parts.parts[0] in ("odak", "assets") or str(parts) in TOOL_FILES):
         raise ValueError("Kurulum yalnız uygulama dosyalarını değiştirebilir.")
     target = root.joinpath(*parts.parts)
     if not target.resolve().is_relative_to(root.resolve()):
@@ -47,11 +49,12 @@ def source_files(source: Path) -> list[str]:
     for directory in ("odak", "assets"):
         files.extend(p.relative_to(source).as_posix() for p in (source/directory).rglob("*")
                      if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc")
-    files.append("tools/install_state.py")
+    files.extend(relative for relative in TOOL_FILES if (source / relative).is_file())
     for relative in files:
         managed_path(source, relative)
-    required = {"app.py", "install.ps1", "bootstrap.ps1", "pyproject.toml", "uv.lock",
-                "odak/ui.py", "odak/model.py", "assets/fonts/Inter.ttf", "assets/fonts/OFL.txt", "assets/odak.ico"}
+    required = {"app.py", "install.ps1", "install.sh", "bootstrap.ps1", ".python-version", "pyproject.toml", "uv.lock",
+                "tools/install_state.py", "tools/install_desktop.py", "odak/ui.py", "odak/model.py",
+                "assets/fonts/Inter.ttf", "assets/fonts/OFL.txt", "assets/odak.ico", "assets/odak.png", "assets/odak.icns"}
     if not required <= set(files):
         raise ValueError("Kurulum arşivinde gerekli uygulama dosyaları eksik.")
     return sorted(files)
@@ -65,6 +68,12 @@ def stop_running(data: Path):
         pid = int(lock.read_text(encoding="utf-8").splitlines()[0])
     except (ValueError, IndexError, UnicodeError):
         raise RuntimeError("Odak kilidi okunamadı. Uygulamayı kapatıp yeniden dene.")
+    if sys.platform != "win32":
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return
+        raise RuntimeError("Güncellemeden önce açık Odak penceresini kapat; görevlerin ve taslakların korunuyor.")
     from ctypes import wintypes
     user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
     kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
@@ -155,21 +164,28 @@ def prepare_data(data: Path, legacy: Path | None = None):
 
 @contextmanager
 def install_lock(target: Path):
-    import msvcrt
     with (target/".install.lock").open("a+b") as stream:
         stream.seek(0)
         stream.write(b"0")
         stream.flush()
         stream.seek(0)
         try:
-            msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
             raise RuntimeError("Başka bir Odak kurulumu çalışıyor.")
         try:
             yield
         finally:
             stream.seek(0)
-            msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            if os.name == "nt":
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
 
 RUNTIME_CHECK = """
@@ -244,7 +260,7 @@ def install(source: Path, target: Path, data: Path, uv: str, revision: str, ref:
                     managed_path(target, relative).unlink(missing_ok=True)
                 command = [uv, "sync", "--locked", "--no-dev", "--python", sys.executable, "--project", str(target)]
                 subprocess.run(command, check=True, env=environment)
-                runtime = target/".venv/Scripts/python.exe"
+                runtime = target / (".venv/Scripts/python.exe" if os.name == "nt" else ".venv/bin/python")
                 subprocess.run([str(runtime), "-c", RUNTIME_CHECK], cwd=target, check=True,
                                env={**environment, "QT_QPA_PLATFORM": "offscreen"})
             except BaseException:
@@ -259,13 +275,16 @@ def install(source: Path, target: Path, data: Path, uv: str, revision: str, ref:
         state = dict(format=FORMAT, data_dir=str(data), files=files, revision=revision, ref=ref,
                      installed_at=datetime.now().isoformat())
         marker.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
-        script = target/"install.ps1"
-        command = [str(Path(os.environ["SystemRoot"])/"System32/WindowsPowerShell/v1.0/powershell.exe"),
-                   "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script), "-DataDir", str(data)]
+        if os.name == "nt":
+            script = target/"install.ps1"
+            command = [str(Path(os.environ["SystemRoot"])/"System32/WindowsPowerShell/v1.0/powershell.exe"),
+                       "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script), "-DataDir", str(data)]
+        else:
+            command = [str(runtime), str(target / "tools/install_desktop.py"), "--data-dir", str(data)]
         if no_shortcuts:
-            command.append("-NoShortcuts")
+            command.append("-NoShortcuts" if os.name == "nt" else "--no-shortcuts")
         if not no_launch:
-            command.append("-Launch")
+            command.append("-Launch" if os.name == "nt" else "--launch")
         subprocess.run(command, check=True, env=environment)
         print(f"Odak hazır. Uygulama: {target}\nGörev verileri: {data}")
 

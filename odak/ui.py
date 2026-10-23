@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import sys
 import time
 from datetime import date, datetime
 from pathlib import Path
@@ -20,6 +21,7 @@ from .controls import ChoiceBox, TimeField, field_style
 from .windows import StyledDialog, DragHeader, FileDialog, Foldout, WINDOW_STYLE, make_resize_handles, position_resize_handles
 from .ordering import TaskDropArea, TaskGrip
 from .startup import Startup
+from .platforms import set_dock_visible
 
 COLORS = {"neutral": "#9a8bff", "urgent": "#ff828e", "soon": "#efc575",
           "overdue": "#ff828e", "done": "#80d3b5", "trash": "#9cacc2", "someday": "#9cacc2"}
@@ -585,6 +587,10 @@ class MainWindow(QWidget):
         self.setWindowTitle("Odak · Görevlerin")
         self.setWindowIcon(app_icon())
         self.setWindowFlags(main_window_flags(self.taskbar_visible))
+        if sys.platform == "darwin":
+            self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)
+            if QApplication.platformName() != "offscreen":
+                set_dock_visible(self.taskbar_visible)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -791,14 +797,14 @@ class MainWindow(QWidget):
         menu.addSeparator()
         try:
             enabled = self.startup.enabled()
-            startup = menu.addAction("Windows başlangıcı: " + ("etkin" if enabled else "devre dışı"))
+            startup = menu.addAction(self.startup.label + ": " + ("etkin" if enabled else "devre dışı"))
             startup.setCheckable(True)
             startup.setChecked(enabled)
             startup.triggered.connect(self.set_startup_enabled)
         except OSError:
-            startup = menu.addAction("Windows başlangıcı kullanılamıyor")
+            startup = menu.addAction("Otomatik başlatma kullanılamıyor")
             startup.setEnabled(False)
-        taskbar = menu.addAction("Görev çubuğunda göster")
+        taskbar = menu.addAction("Dock'ta göster" if sys.platform == "darwin" else "Görev çubuğunda göster")
         taskbar.setCheckable(True)
         taskbar.setChecked(self.taskbar_visible)
         taskbar.triggered.connect(self.set_taskbar_visible)
@@ -819,10 +825,16 @@ class MainWindow(QWidget):
         except OSError as exc:
             self.report_error(exc)
             return
-        self.notify("Windows başlangıcı etkinleştirildi." if enabled else "Windows başlangıcı devre dışı bırakıldı.")
+        self.notify("Otomatik başlatma etkinleştirildi." if enabled else "Otomatik başlatma devre dışı bırakıldı.")
 
     def set_taskbar_visible(self, visible, persist=True):
         visible = bool(visible)
+        if sys.platform == "darwin" and QApplication.platformName() != "offscreen":
+            try:
+                set_dock_visible(visible)
+            except OSError as exc:
+                self.report_error(exc)
+                return
         if persist:
             try:
                 self.store.set_setting("taskbar_visible", visible)

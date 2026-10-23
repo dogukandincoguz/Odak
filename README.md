@@ -1,6 +1,6 @@
 # Odak
 
-Windows için görev, hatırlatma ve odak sayacı uygulaması. Windows hesabınıza giriş yaptığınızda sağ üstte açılır ve diğer normal pencerelerin üzerinde kalır. Varsayılan olarak yalnız sistem tepsisinde görünür; üç nokta menüsünden görev çubuğu simgesi de açılabilir. Kurulumdan sonra çevrimdışı çalışır ve hesap gerektirmez. Görevler bu bilgisayarda saklanır.
+Windows, Linux ve macOS için görev, hatırlatma ve odak sayacı uygulaması. Oturum açıldığında sağ üstte açılır ve diğer normal pencerelerin üzerinde kalır. Varsayılan olarak sistem tepsisinde/macOS menü çubuğunda görünür; menüden görev çubuğu veya Dock simgesi de açılabilir. Kurulumdan sonra çevrimdışı çalışır ve hesap gerektirmez. Görevler bu bilgisayarda saklanır.
 
 ## Tek komutla kurulum ve güncelleme
 
@@ -56,12 +56,12 @@ Kurulum, Windows hesabınıza girişte Odak'ı başlatan bir kısayol oluşturur
 
 ## Kaynak koddan çalıştırma
 
-Geliştirme için Git ve uv gerekir. Depoyu klonlayıp bağımlılıkları kurun; Python 3.13 bulunmuyorsa uv indirir:
+Geliştirme için Git ve [uv](https://docs.astral.sh/uv/getting-started/installation/) gerekir. Proje Python **3.15.1** kullanır; bulunmuyorsa uv indirir:
 
 ```powershell
 git clone --branch dev https://github.com/dogukandincoguz/Odak.git
 cd Odak
-uv sync --locked --python 3.13
+uv sync --locked --python 3.15.1
 ```
 
 Uygulamayı doğrudan çalıştırmak için:
@@ -76,7 +76,29 @@ Masaüstü ve Windows başlangıç kısayollarını oluşturup uygulamayı açma
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -Launch
 ```
 
-Kısayollar proje klasörünü kullanır. Klasörü taşırsanız `install.ps1` komutunu yeni konumda tekrar çalıştırın. Kaynak koddan çalıştırmada veriler varsayılan olarak projenin `data/` klasöründedir; yukarıdaki tek komutla kurulumun veri konumu farklıdır.
+Kısayollar proje klasörünü kullanır. Klasörü taşırsanız kurulum komutunu yeni konumda tekrar çalıştırın. Windows'ta kaynak koddan çalıştırmada veriler varsayılan olarak projenin `data/` klasöründedir; yukarıdaki tek komutla kurulumun veri konumu farklıdır.
+
+### Linux ve macOS
+
+Git ve uv kuruluysa aynı klonlama/bağımlılık adımlarından sonra:
+
+```sh
+sh install.sh --launch
+```
+
+Bu komut kullanıcı hesabına bir başlatıcı ve oturum açılış kaydı ekler; yönetici yetkisi istemez. Linux'ta uygulama menüsüne `odak.desktop`, macOS'ta `~/Applications/Odak.app` oluşturur. Kaynak klasörünü ve `.venv` ortamını yerinde tutun. Başlangıç kaydını uygulamanın üç nokta menüsünden kapatıp açabilirsiniz. Kayıt macOS'ta sonraki oturum açılışında uygulanır; uygulama çarpıdan kapatıldığında otomatik yeniden başlatılmaz.
+
+| | Linux | macOS |
+| --- | --- | --- |
+| Varsayılan veri | `$XDG_DATA_HOME/Odak` veya `~/.local/share/Odak` | `~/Library/Application Support/Odak` |
+| Otomatik açılış | `$XDG_CONFIG_HOME/autostart/odak.desktop` veya `~/.config/autostart/odak.desktop` | `~/Library/LaunchAgents/io.github.dogukandincoguz.odak.plist` |
+| Görünürlük seçeneği | Görev çubuğunda göster | Dock'ta göster |
+
+Eski bir kaynak kurulumunun `data/odak.sqlite3` dosyası varsa aynı konum kullanılmaya devam eder. `--data-dir` ile özel konum seçilebilir; kurulumda seçilen konum başlatıcıya ve başlangıç kaydına aynen aktarılır. `sh install.sh --no-shortcuts` yalnız ortamı hazırlar; başlangıç/başlatıcı kayıtlarını değiştirmez.
+
+Linux'ta Qt'nin ihtiyaç duyduğu masaüstü kitaplıkları da sistemde bulunmalıdır. Debian/Ubuntu'da `libegl1`, `libopengl0`, `libxkbcommon-x11-0` ve `libxcb-cursor0` paketleri gerekebilir. Sistem tepsisi ve bildirim desteği masaüstü ortamına bağlıdır; tepsi bulunamazsa eksi düğmesi pencereyi erişilemez hâle gizlemez. Wayland'da kesin pencere konumu ve üstte tutma politikasını pencere yöneticisi belirler; X11 ile sağ üste yerleştirme kullanılabilir.
+
+Kaldırırken önce uygulamadan otomatik başlatmayı kapatın, uygulamayı kapatıp oluşturulan başlatıcıyı kaldırın. Görevleri korumak için veri klasörünü saklayın.
 
 Arayüz **PySide6-Essentials (Qt)** ile yazılmıştır; veriler **SQLite** içinde saklanır. Python ortamı ve bağımlılıklar **uv** ile yönetilir. Uygulama [Inter](assets/fonts/README.md) yazı tipini kendi dosyalarından yükler.
 

@@ -137,7 +137,7 @@ class DesktopUiTests(unittest.TestCase):
     def test_taskbar_action_changes_window_type_without_moving_and_survives_restart(self):
         geometry = self.window.geometry()
         menu = self.window.create_menu()
-        action = next(action for action in menu.actions() if action.text() == "Görev çubuğunda göster")
+        action = next(action for action in menu.actions() if action.text() == ("Dock'ta göster" if sys.platform == "darwin" else "Görev çubuğunda göster"))
         self.assertFalse(action.isChecked())
         action.trigger()
         self.app.processEvents()
