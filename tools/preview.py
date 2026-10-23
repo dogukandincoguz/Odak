@@ -12,7 +12,7 @@ sys.path.insert(0, str(PROJECT))
 
 from PySide6.QtWidgets import QApplication
 from odak.model import Store
-from odak.ui import MainWindow, TaskDialog, app_icon, configure_app
+from odak.ui import MainWindow, TaskDialog, configure_app
 from odak.panels import ReminderDialog
 
 
@@ -20,9 +20,6 @@ app = QApplication([])
 configure_app(app)
 output = PROJECT / "artifacts"
 output.mkdir(exist_ok=True)
-assets = PROJECT / "assets"
-assets.mkdir(exist_ok=True)
-assert app_icon().pixmap(128, 128).save(str(assets / "odak.ico"), "ICO")
 with tempfile.TemporaryDirectory() as directory:
     store = Store(Path(directory) / "preview.sqlite3")
     now = datetime.now().replace(second=0, microsecond=0)

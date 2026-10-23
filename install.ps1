@@ -40,6 +40,20 @@ if (-not $NoShortcuts) {
         $shortcut.Save()
         Write-Output ('Kisayol hazir: ' + $shortcutPath)
     }
+    # Explorer can keep the previous image when an ICO is updated at the same path.
+    if (-not ('Odak.ShellIcons' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+namespace Odak {
+    public static class ShellIcons {
+        [DllImport("shell32.dll")]
+        public static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
+    }
+}
+'@
+    }
+    [Odak.ShellIcons]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
 }
 if ($Launch) {
     # The application is the visible interactive window requested by the user.

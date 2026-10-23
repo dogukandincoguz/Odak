@@ -23,3 +23,15 @@ artifacts/
 /SECURITY*.md
 /security*.md
 /docs/security/
+
+# Local assistant memory, work notes, and generated reports.
+/[Cc][Oo][Dd][Ee][Xx].md
+/[Aa][Gg][Ee][Nn][Tt][Ss].md
+/.local/
+/notes/
+/reports/
+/screenshots/
+/coverage/
+/.coverage
+/htmlcov/
+/.pytest_cache/

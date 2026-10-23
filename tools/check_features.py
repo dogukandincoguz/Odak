@@ -93,6 +93,54 @@ try:
         assert [card.task.id for card in window.cards] == identities[1:]+identities[:1], "Native drag must reorder the Today cards"
         assert [task.id for task in sorted(store.all(),key=lambda t:t.today_position)] == identities[1:]+identities[:1]
 
+        window.set_tab("active")
+        app.processEvents()
+        initial = [card.task.id for card in window.cards]
+        grip = window.cards[-1].findChild(TaskGrip)
+        first = window.cards[0]
+        gesture(physical(grip), physical(first, QPoint(first.width()//2, 3)))
+        expected = initial[-1:] + initial[:-1]
+        assert [card.task.id for card in window.cards] == expected, "Native drag must reorder the main task list"
+        assert sorted(store.task_positions("active"), key=store.task_positions("active").get) == expected
+        window.set_tab("today")
+        assert [card.task.id for card in window.cards] == identities[1:]+identities[:1], "Today must keep its own order"
+
+        # The header, hint and gap above the first card are invisible drop targets.
+        for tab in ("today", "active"):
+            window.set_tab(tab)
+            for target_widget, target_point in (
+                (window.section_title, window.section_title.rect().center()),
+                (window.section_hint, window.section_hint.rect().center()),
+                (window.list_header, QPoint(window.list_header.width()//2, window.list_header.height()-3)),
+            ):
+                app.processEvents()
+                initial = [card.task.id for card in window.cards]
+                grip = window.cards[-1].findChild(TaskGrip)
+                gesture(physical(grip), physical(target_widget, target_point))
+                expected = initial[-1:] + initial[:-1]
+                assert [card.task.id for card in window.cards] == expected, f"Header drop must prepend in {tab}"
+                assert window.list_widget.indicator is None, "The drop indicator must disappear after release"
+
+        geometry = window.geometry()
+        user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+        user32.GetWindow.argtypes = [wintypes.HWND, ctypes.c_uint]
+        user32.GetWindow.restype = wintypes.HWND
+        window.set_taskbar_visible(True)
+        app.processEvents()
+        style = user32.GetWindowLongW(int(window.winId()), -20)
+        owner = user32.GetWindow(int(window.winId()), 4)
+        assert not style & 0x80 and (not owner or style & 0x40000), "Taskbar mode must expose an unowned application window"
+        assert window.geometry() == geometry
+        window.hide_to_tray()
+        app.processEvents()
+        assert window.isMinimized(), "Taskbar mode must minimize to the taskbar"
+        window.reveal()
+        window.set_taskbar_visible(False)
+        app.processEvents()
+        style = user32.GetWindowLongW(int(window.winId()), -20)
+        assert style & 0x80 and not style & 0x40000, "Tray mode must hide the taskbar button"
+        assert window.geometry() == geometry
+
         before = window.size()
         corner = window._resize_handles[-1]
         start = physical(corner)
@@ -120,4 +168,4 @@ try:
 finally:
     user32.SetCursorPos(original_cursor.x,original_cursor.y)
 
-print("Native Windows feature check: mouse drag reorder, persisted order, corner resize and custom header move OK.")
+print("Native Windows feature check: main/Today drag order, invisible header drops, taskbar modes, corner resize and custom header move OK.")

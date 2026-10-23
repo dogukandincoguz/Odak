@@ -45,7 +45,8 @@ def main():
             environment.update(LOCALAPPDATA=str(temporary/"isolated-localappdata"),
                 PATH=str(Path(os.environ["SystemRoot"])/"System32")+os.pathsep+str(powershell.parent),
                 UV_PYTHON_INSTALL_DIR=str(temporary/"managed-python"),
-                UV_PYTHON_BIN_DIR=str(temporary/"python-bin"), UV_PYTHON_PREFERENCE="only-managed")
+                UV_PYTHON_BIN_DIR=str(temporary/"python-bin"), UV_PYTHON_PREFERENCE="only-managed",
+                UV_PYTHON_NO_REGISTRY="1")
         command=[str(powershell),"-NoProfile","-ExecutionPolicy","Bypass","-File",str(PROJECT/"bootstrap.ps1"),
             "-SourceArchive",str(archive),"-SourceSha256",zip_digest(archive),
             "-InstallDir",str(target),"-DataDir",str(data),"-NoLaunch","-NoShortcuts"]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import logging
+import os
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -12,6 +13,7 @@ from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from odak.model import Store
+from odak.platforms import default_data_directory
 from odak.ui import MainWindow, app_icon, configure_app
 
 PROJECT = Path(__file__).resolve().parent
@@ -19,7 +21,7 @@ PROJECT = Path(__file__).resolve().parent
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Odak masaüstü görev takipçisi")
-    parser.add_argument("--data-dir", type=Path, default=PROJECT / "data")
+    parser.add_argument("--data-dir", type=Path, default=default_data_directory(PROJECT))
     args = parser.parse_args()
     if sys.platform == "win32":
         import ctypes
@@ -43,7 +45,8 @@ def main() -> int:
     # Lock + local IPC: ikinci başlatma var olan pencereyi öne getirir.
     lock = QLockFile(str(args.data_dir / "odak.lock"))
     lock.setStaleLockTime(0)
-    server_name = "odak-" + hashlib.sha256(str(args.data_dir.resolve()).casefold().encode()).hexdigest()[:24]
+    identity = os.path.normcase(str(args.data_dir.resolve()))
+    server_name = "odak-" + hashlib.sha256(identity.encode()).hexdigest()[:24]
     if not lock.tryLock(100):
         socket = QLocalSocket()
         socket.connectToServer(server_name)

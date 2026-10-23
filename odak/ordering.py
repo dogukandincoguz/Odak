@@ -1,9 +1,9 @@
-"""Bugün listesindeki kartlar için tutamak ve bırakma göstergesi."""
+"""Görev listelerindeki kartlar için tutamak ve bırakma göstergesi."""
 from PySide6.QtCore import QMimeData, QPoint, QRectF, Qt
 from PySide6.QtGui import QColor, QDrag, QPainter, QPen
 from PySide6.QtWidgets import QApplication, QToolButton, QWidget
 
-MIME = "application/x-odak-today-task"
+MIME = "application/x-odak-task"
 
 
 class TaskGrip(QToolButton):
@@ -29,11 +29,13 @@ class TaskGrip(QToolButton):
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
-            order = self.owner._today_order
+            order = self.owner._list_order
+            if self.task_id not in order:
+                return
             index = order.index(self.task_id)
             next_index = index + (-1 if event.key() == Qt.Key.Key_Up else 1)
             if 0 <= next_index < len(order):
-                self.owner.move_today(self.task_id, order[next_index], next_index > index)
+                self.owner.move_task(self.task_id, order[next_index], next_index > index)
             event.accept()
             return
         super().keyPressEvent(event)
@@ -53,10 +55,12 @@ class TaskGrip(QToolButton):
             drag.setPixmap(self.card.grab().scaledToWidth(300, Qt.TransformationMode.SmoothTransformation))
             drag.setHotSpot(QPoint(12, 12))
             self.owner._task_dragging = True
+            self.owner._drag_tab = self.owner.current_tab
             try:
                 drag.exec(Qt.DropAction.MoveAction)
             finally:
                 self.owner._task_dragging = False
+                self.owner._drag_tab = None
                 self.owner.list_widget.clear_indicator()
                 self.owner.refresh(force=True)
             return
@@ -68,24 +72,28 @@ class TaskGrip(QToolButton):
 
 
 class TaskDropArea(QWidget):
-    def __init__(self, owner):
+    def __init__(self, owner, prepend_only=False):
         super().__init__()
         self.owner, self.indicator = owner, None
+        self.prepend_only = prepend_only
         self.setAcceptDrops(True)
 
     def eligible(self, event):
         source = event.source()
         return (isinstance(source, TaskGrip) and source.owner is self.owner and event.mimeData().hasFormat(MIME)
-                and self.owner.current_tab == "today" and not self.owner.search.text().strip())
+                and self.owner.current_view == "tasks" and self.owner.current_tab == self.owner._drag_tab
+                and not self.owner.search.text().strip())
 
     def dragEnterEvent(self, event):
         if self.eligible(event):
             event.acceptProposedAction()
 
     def target(self, y):
+        if self.prepend_only:
+            y = -1
         for card in self.owner.cards:
             if y < card.geometry().center().y():
-                return card.task.id, False, card.y() - 7
+                return card.task.id, False, max(2, card.y() - 7)
         if self.owner.cards:
             card = self.owner.cards[-1]
             return card.task.id, True, card.geometry().bottom() + 7
@@ -93,31 +101,33 @@ class TaskDropArea(QWidget):
 
     def dragMoveEvent(self, event):
         if self.eligible(event):
-            target = self.target(event.position().y())
-            self.indicator = target[2] if target else None
             viewport = self.owner.scroll.viewport()
             local = viewport.mapFromGlobal(self.mapToGlobal(event.position().toPoint()))
             bar = self.owner.scroll.verticalScrollBar()
-            if local.y() < 40:
+            if self.prepend_only:
+                bar.setValue(0)
+            elif local.y() < 40:
                 bar.setValue(bar.value() - 20)
             elif local.y() > viewport.height() - 40:
                 bar.setValue(bar.value() + 20)
-            self.update()
+            target = self.target(event.position().y())
+            self.owner.list_widget.indicator = target[2] if target else None
+            self.owner.list_widget.update()
             event.acceptProposedAction()
 
     def dragLeaveEvent(self, event):
         self.clear_indicator()
 
     def clear_indicator(self):
-        self.indicator = None
-        self.update()
+        self.owner.list_widget.indicator = None
+        self.owner.list_widget.update()
 
     def dropEvent(self, event):
         if self.eligible(event):
             target = self.target(event.position().y())
             if target:
                 identity = bytes(event.mimeData().data(MIME)).decode("ascii")
-                self.owner.move_today(identity, target[0], target[1])
+                self.owner.move_task(identity, target[0], target[1])
             event.acceptProposedAction()
         self.clear_indicator()
 

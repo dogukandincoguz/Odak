@@ -19,8 +19,9 @@ class InstallerTests(unittest.TestCase):
         self.target = self.root/"application"
         self.data = self.root/"user-data"
         self.source.mkdir()
-        for name in ("app.py","bootstrap.ps1","install.ps1","pyproject.toml","uv.lock","README.md",
-                     "odak/ui.py","odak/model.py","assets/fonts/Inter.ttf","assets/fonts/OFL.txt","assets/odak.ico","tools/install_state.py"):
+        for name in ("app.py","bootstrap.ps1","install.ps1","install.sh",".python-version","pyproject.toml","uv.lock","README.md",
+                     "odak/ui.py","odak/model.py","assets/fonts/Inter.ttf","assets/fonts/OFL.txt","assets/odak.ico",
+                     "assets/odak.png","assets/odak.icns","tools/install_state.py","tools/install_desktop.py"):
             file = self.source/name
             file.parent.mkdir(parents=True,exist_ok=True)
             file.write_text("new source",encoding="utf-8")
@@ -42,8 +43,8 @@ class InstallerTests(unittest.TestCase):
             install(self.source,self.target,self.data,"uv.exe","revision","dev",no_launch=True,no_shortcuts=True)
         self.assertEqual(run.call_count,3)
         self.assertIn("--locked",run.call_args_list[0].args[0])
-        self.assertIn("-NoShortcuts",run.call_args_list[-1].args[0])
-        self.assertNotIn("-Launch",run.call_args_list[-1].args[0])
+        self.assertIn("-NoShortcuts" if os.name == "nt" else "--no-shortcuts",run.call_args_list[-1].args[0])
+        self.assertNotIn("-Launch" if os.name == "nt" else "--launch",run.call_args_list[-1].args[0])
         marker=json.loads((self.target/".odak-install.json").read_text(encoding="utf-8"))
         self.assertEqual((marker["format"],marker["data_dir"]),(FORMAT,str(self.data.resolve())))
         self.assertIn("assets/fonts/OFL.txt",marker["files"])
@@ -94,6 +95,16 @@ class InstallerTests(unittest.TestCase):
     def test_managed_paths_reject_data_git_and_traversal(self):
         for relative in ("../outside.py","odak/../../outside.py","data/odak.sqlite3",".git/config",".venv/file","C:/outside.py"):
             with self.assertRaises(ValueError):managed_path(self.target,relative)
+
+    @unittest.skipIf(os.name == "nt", "Unix symlink fixture")
+    def test_arbitrary_symlink_parent_cannot_redirect_an_install(self):
+        outside = self.root / "outside"
+        outside.mkdir()
+        link = self.root / "redirect"
+        link.symlink_to(outside, target_is_directory=True)
+        with self.assertRaises(ValueError):
+            install(self.source, link / "application", self.data, "uv", "v1", "dev")
+        self.assertEqual(list(outside.iterdir()), [])
 
     def test_migration_copies_sqlite_wal_and_existing_destination_wins(self):
         legacy=self.root/"legacy"

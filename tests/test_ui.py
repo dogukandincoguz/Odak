@@ -93,7 +93,8 @@ class UiTests(unittest.TestCase):
         buttons = self.window.cards[0].findChildren(QToolButton)
         QTest.mouseClick(next(b for b in buttons if b.accessibleName().startswith("Sil")), Qt.MouseButton.LeftButton)
         self.window.set_tab("trash")
-        QTest.mouseClick(self.window.cards[0].findChild(QToolButton), Qt.MouseButton.LeftButton)
+        buttons = self.window.cards[0].findChildren(QToolButton)
+        QTest.mouseClick(next(b for b in buttons if b.accessibleName() == "Görevi geri al"), Qt.MouseButton.LeftButton)
         self.window.set_tab("done")
         self.assertEqual(len(self.window.cards), 1)
 

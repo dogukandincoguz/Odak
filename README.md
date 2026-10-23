@@ -1,32 +1,32 @@
 # Odak
 
-Windows için görev, hatırlatma ve odak sayacı uygulaması. Windows hesabınıza giriş yaptığınızda sağ üstte açılır ve diğer normal pencerelerin üzerinde kalır. Görev çubuğunda görünmez; simgesi sağ alttaki sistem tepsisindedir. Kurulumdan sonra çevrimdışı çalışır ve hesap gerektirmez. Görevler bu bilgisayarda saklanır.
+Windows, Linux ve macOS için görev, hatırlatma ve odak sayacı uygulaması. Oturum açıldığında sağ üstte açılır ve diğer normal pencerelerin üzerinde kalır. Varsayılan olarak sistem tepsisinde/macOS menü çubuğunda görünür; menüden görev çubuğu veya Dock simgesi de açılabilir. Kurulumdan sonra çevrimdışı çalışır ve hesap gerektirmez. Görevler bu bilgisayarda saklanır.
 
 ## Tek komutla kurulum ve güncelleme
 
 Windows PowerShell 5.1 veya PowerShell 7'yi açıp şu komutu çalıştırın:
 
 ```powershell
-irm https://raw.githubusercontent.com/dogukandincoguz/Odak/c5abd8963c4c7dfe6c5539a21ce88e21633c1c02/bootstrap.ps1 | iex
+irm https://raw.githubusercontent.com/dogukandincoguz/Odak/821aa266abfb0fd4de50a63af31fc6494b68c934/bootstrap.ps1 | iex
 ```
 
 Önceden Git veya Python kurmanız gerekmez; yönetici yetkisi, GitHub hesabı veya token da istenmez. **Kurulum ve güncelleme için internet bağlantısı gerekir.**
 
 Kurulum komutu ve indirilecek uygulama **sabit commitlere bağlıdır**; `dev` veya `main` dalındaki sonraki değişiklikleri kendiliğinden almaz. Betik, uygulama arşivindeki dosya adlarını ve içeriklerini beklenen SHA-256 değeriyle doğrular. Eşleşmezse uygulama dosyalarını ve verileri değiştirmeden durur.
 
-uv yoksa [resmi uv 0.13.5 sürüm paketini](https://github.com/astral-sh/uv/releases/tag/0.13.5) indirir; ZIP'i ve `uv.exe` dosyasını ayrı SHA-256 değerleriyle doğruladıktan sonra kullanıcıya özel kurar. Üçüncü taraf bir PowerShell kurucusu çalıştırmaz. Python 3.13 yoksa uv üzerinden indirir. Bağımlılıkları `uv.lock` dosyasındaki sürümlerle kurar, masaüstü ve Windows başlangıç kısayollarını oluşturur ve Odak'ı açar.
+uv yoksa veya sürümü 0.13.5'ten eskiyse [resmi uv 0.13.5 sürüm paketini](https://github.com/astral-sh/uv/releases/tag/0.13.5) indirir; ZIP'i ve `uv.exe` dosyasını ayrı SHA-256 değerleriyle doğruladıktan sonra kullanıcıya özel kurar. Üçüncü taraf bir PowerShell kurucusu çalıştırmaz. Python 3.15.1 yoksa uv üzerinden indirir. Bağımlılıkları `uv.lock` dosyasındaki sürümlerle kurar, masaüstü ve Windows başlangıç kısayollarını oluşturur ve Odak'ı açar.
 
 Kurulumdan sonra masaüstündeki **Odak** kısayolunu kullanabilirsiniz; terminal penceresi açılmaz. **Yeni sürüme geçmek için README'deki güncel kurulum komutunu kullanın.** Önceden kaydettiğiniz komut aynı sürümü yeniden kurar; uygulama güncellemeleri kendiliğinden indirmez.
 
 - Uygulama dosyaları: `%LOCALAPPDATA%\Programs\Odak`
 - Görevler, ayarlar ve yedekler: `%LOCALAPPDATA%\Odak\data`
-- Otomatik indirilen uv: `%LOCALAPPDATA%\Programs\Odak-Tools\uv\0.13.5\<mimari>`; PATH üzerinde zaten uv varsa mevcut kurulum kullanılır.
+- Otomatik indirilen uv: `%LOCALAPPDATA%\Programs\Odak-Tools\uv\0.13.5\<mimari>`; PATH üzerindeki uv 0.13.5 veya daha yeniyse mevcut kurulum kullanılır.
 
 Uygulama ve veriler ayrı tutulur. Güncelleme öncesi veri yedeği alınır; son üç yedek korunur. Açık Odak normal biçimde kapatılır. Açık bir form veya devam eden bir işlem varsa kurulum durur; formu kaydedip veya kapatıp yeniden deneyin. Ortam doğrulaması başarısız olursa önceki uygulama dosyaları geri konur; aynı komutla yeniden denenebilir. Hedef klasörün boş veya bu betikle yönetilen bir Odak kurulumu olması gerekir.
 
 Eski kaynak kod kurulumundan ilk geçişte mevcut masaüstü kısayolunun veri klasörü bulunur. Yeni konumda henüz veritabanı yoksa eski veritabanı SQLite'ın yedekleme API'siyle kopyalanır; eski veri dosyası korunur. Yeni konumda zaten veritabanı varsa eski kopyayla değiştirilmez.
 
-`irm | iex` bağlantıdaki PowerShell kodunu indirip doğrudan çalıştırır. Çalıştırılacak sabit sürümü [buradan inceleyebilirsiniz](https://github.com/dogukandincoguz/Odak/blob/c5abd8963c4c7dfe6c5539a21ce88e21633c1c02/bootstrap.ps1).
+`irm | iex` bağlantıdaki PowerShell kodunu indirip doğrudan çalıştırır. Çalıştırılacak sabit sürümü [buradan inceleyebilirsiniz](https://github.com/dogukandincoguz/Odak/blob/821aa266abfb0fd4de50a63af31fc6494b68c934/bootstrap.ps1).
 
 Kurulum betiğini dosya olarak indirip çalıştırırken aşağıdaki seçenekler kullanılabilir:
 
@@ -34,7 +34,7 @@ Kurulum betiğini dosya olarak indirip çalıştırırken aşağıdaki seçenekl
 | --- | --- |
 | `-InstallDir` | Uygulamanın kurulacağı klasörü seçer. |
 | `-DataDir` | Verilerin saklanacağı klasörü seçer; uygulama klasöründen ayrı olmalıdır. |
-| `-Ref` | Uygulama sürümünü seçer; varsayılan `13598e705eb974765e218f9b159c721e53645f24` commitidir. Farklı bir kaynak için `-SourceSha256` da gerekir. |
+| `-Ref` | Uygulama sürümünü seçer; varsayılan `ae50f29bc22fd500836f6c6189b903d97dee0967` commitidir. Farklı bir kaynak için `-SourceSha256` da gerekir. |
 | `-SourceSha256` | Farklı bir kaynağın önceden incelenmiş dosya adları ve içeriklerine ait SHA-256 değerini belirtir. |
 | `-NoLaunch` | Kurulum sonunda uygulamayı açmaz. |
 | `-NoShortcuts` | Masaüstü ve Windows başlangıç kısayollarını oluşturmaz veya değiştirmez. |
@@ -42,7 +42,7 @@ Kurulum betiğini dosya olarak indirip çalıştırırken aşağıdaki seçenekl
 Örneğin, kısayollara dokunmadan kurmak veya güncellemek için:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/dogukandincoguz/Odak/c5abd8963c4c7dfe6c5539a21ce88e21633c1c02/bootstrap.ps1' -OutFile .\odak-bootstrap.ps1
+Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/dogukandincoguz/Odak/821aa266abfb0fd4de50a63af31fc6494b68c934/bootstrap.ps1' -OutFile .\odak-bootstrap.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\odak-bootstrap.ps1 -NoShortcuts
 ```
 
@@ -50,18 +50,18 @@ Aynı kuruluma ait veri klasörü kurulum kaydından hatırlanır. Sistemin kal�
 
 ## Otomatik başlatma ve kapatma
 
-Kurulum, Windows hesabınıza girişte Odak'ı başlatan bir kısayol oluşturur. Otomatik başlatmayı kapatmak için `Win+R` → `shell:startup` klasöründeki **Odak** kısayolunu kaldırın. Uygulama ve görev verileri silinmez. Kurulum komutunu yeniden çalıştırmak bu kısayolu tekrar oluşturur; bunu istemiyorsanız `-NoShortcuts` seçeneğini kullanın.
+Kurulum, Windows hesabınıza girişte Odak'ı başlatan bir kısayol oluşturur. Üç nokta menüsündeki **Başlangıçta çalıştırma: etkin / devre dışı** satırına tıklayarak otomatik başlatmayı kapatıp açabilirsiniz. Satırın yanında tik bulunmaz; yazı mevcut durumu gösterir. Aynı menü Linux ve macOS'ta da kullanılabilir. Bu işlem kullanılan veri klasörünü korur ve masaüstü kısayolunu değiştirmez. Elle kapatmak için `Win+R` → `shell:startup` klasöründeki **Odak** kısayolu da kaldırılabilir. Kurulum komutunu yeniden çalıştırmak bu kısayolu tekrar oluşturur; bunu istemiyorsanız `-NoShortcuts` seçeneğini kullanın.
 
-Ana penceredeki **eksi** düğmesi uygulamayı sistem tepsisine gizler; hatırlatmalar ve sayaç çalışmaya devam eder. **×** düğmesi uygulamayı tamamen kapatır. Bir sonraki Windows oturumunda otomatik başlatma etkinse yeniden açılır. Daha erken açmak için masaüstü kısayolunu kullanabilirsiniz.
+Üç nokta menüsündeki **Görev çubuğunda göster** seçeneği açılışlar arasında hatırlanır. Açıkken **eksi** düğmesi pencereyi görev çubuğuna küçültür; kapalıyken sistem tepsisine gizler. Hatırlatmalar ve sayaç çalışmaya devam eder. **×** düğmesi uygulamayı tamamen kapatır. Bir sonraki Windows oturumunda otomatik başlatma etkinse yeniden açılır. Daha erken açmak için masaüstü kısayolunu kullanabilirsiniz.
 
 ## Kaynak koddan çalıştırma
 
-Geliştirme için Git ve uv gerekir. Depoyu klonlayıp bağımlılıkları kurun; Python 3.13 bulunmuyorsa uv indirir:
+Geliştirme için Git ve [uv 0.13.5 veya daha yenisi](https://docs.astral.sh/uv/getting-started/installation/) gerekir. Proje Python **3.15.1** kullanır; bulunmuyorsa uv indirir:
 
 ```powershell
 git clone --branch dev https://github.com/dogukandincoguz/Odak.git
 cd Odak
-uv sync --locked --python 3.13
+uv sync --locked --python 3.15.1
 ```
 
 Uygulamayı doğrudan çalıştırmak için:
@@ -76,7 +76,29 @@ Masaüstü ve Windows başlangıç kısayollarını oluşturup uygulamayı açma
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -Launch
 ```
 
-Kısayollar proje klasörünü kullanır. Klasörü taşırsanız `install.ps1` komutunu yeni konumda tekrar çalıştırın. Kaynak koddan çalıştırmada veriler varsayılan olarak projenin `data/` klasöründedir; yukarıdaki tek komutla kurulumun veri konumu farklıdır.
+Kısayollar proje klasörünü kullanır. Klasörü taşırsanız kurulum komutunu yeni konumda tekrar çalıştırın. Windows'ta kaynak koddan çalıştırmada veriler varsayılan olarak projenin `data/` klasöründedir; yukarıdaki tek komutla kurulumun veri konumu farklıdır.
+
+### Linux ve macOS
+
+Git ve uv kuruluysa aynı klonlama/bağımlılık adımlarından sonra:
+
+```sh
+sh install.sh --launch
+```
+
+Bu komut kullanıcı hesabına bir başlatıcı ve oturum açılış kaydı ekler; yönetici yetkisi istemez. Linux'ta uygulama menüsüne `odak.desktop`, macOS'ta `~/Applications/Odak.app` oluşturur. Kaynak klasörünü ve `.venv` ortamını yerinde tutun. Başlangıç kaydını uygulamanın üç nokta menüsünden kapatıp açabilirsiniz. Kayıt macOS'ta sonraki oturum açılışında uygulanır; uygulama çarpıdan kapatıldığında otomatik yeniden başlatılmaz.
+
+| | Linux | macOS |
+| --- | --- | --- |
+| Varsayılan veri | `$XDG_DATA_HOME/Odak` veya `~/.local/share/Odak` | `~/Library/Application Support/Odak` |
+| Otomatik açılış | `$XDG_CONFIG_HOME/autostart/odak.desktop` veya `~/.config/autostart/odak.desktop` | `~/Library/LaunchAgents/io.github.dogukandincoguz.odak.plist` |
+| Görünürlük seçeneği | Görev çubuğunda göster | Dock'ta göster |
+
+Eski bir kaynak kurulumunun `data/odak.sqlite3` dosyası varsa aynı konum kullanılmaya devam eder. `--data-dir` ile özel konum seçilebilir; kurulumda seçilen konum başlatıcıya ve başlangıç kaydına aynen aktarılır. `sh install.sh --no-shortcuts` yalnız ortamı hazırlar; başlangıç/başlatıcı kayıtlarını değiştirmez.
+
+Linux'ta Qt'nin ihtiyaç duyduğu masaüstü kitaplıkları da sistemde bulunmalıdır. Debian/Ubuntu'da `libegl1`, `libopengl0`, `libxkbcommon-x11-0` ve `libxcb-cursor0` paketleri gerekebilir. Sistem tepsisi ve bildirim desteği masaüstü ortamına bağlıdır; tepsi bulunamazsa eksi düğmesi pencereyi erişilemez hâle gizlemez. Wayland'da kesin pencere konumu ve üstte tutma politikasını pencere yöneticisi belirler; X11 ile sağ üste yerleştirme kullanılabilir.
+
+Kaldırırken önce uygulamadan otomatik başlatmayı kapatın, uygulamayı kapatıp oluşturulan başlatıcıyı kaldırın. Görevleri korumak için veri klasörünü saklayın.
 
 Arayüz **PySide6-Essentials (Qt)** ile yazılmıştır; veriler **SQLite** içinde saklanır. Python ortamı ve bağımlılıklar **uv** ile yönetilir. Uygulama [Inter](assets/fonts/README.md) yazı tipini kendi dosyalarından yükler.
 
@@ -87,9 +109,10 @@ Arayüz **PySide6-Essentials (Qt)** ile yazılmıştır; veriler **SQLite** içi
 - Deadline'a **24 saatten az** kalan işler kırmızı, **24–72 saat** kalanlar sarıdır. Daha uzak veya deadline'ı olmayan görevler normal renktedir.
 - Süresi dolan işler **Geçenler → Deadline’ı geçenler** bölümüne otomatik taşınır.
 - Tik simgesi görevi tamamlar; tamamlananlar **Bitenler** bölümünden yeniden açılabilir.
+- Kartın solundaki altı noktalı tutamağı sürükleyerek görevleri yukarı veya aşağı taşıyabilirsiniz. Her listenin sırası ayrı kaydedilir; **Bugün** sırası diğer listelerden bağımsızdır. İlk elle sıralamadan sonra yeni gelen görevler o listenin sonuna eklenir. Arama sırasında tutamaklar gizlenir; temizleyince geri gelir. Tutamak odaktayken yukarı/aşağı okları da sıralamayı değiştirir.
 - Silinen işler **Silinenler → Son silinenler** alanından **10 dakika** boyunca geri alınabilir. Süre uygulama kapalıyken de ilerler; süresi dolan kayıtlar uygulama çalışırken kalıcı olarak temizlenir.
 - Kalem simgesi başlığı, notu, deadline'ı ve alt adımları düzenler. **Görevler** bölümünde **Ctrl+F** arama alanına geçer; arama seçili listedeki başlık ve notları tarar.
-- Eksi düğmesi pencereyi sistem tepsisine gizler. Sağ alttaki tepsi simgesine tıklayarak veya sağ tık → **Odak’ı göster** ile pencereyi geri açabilirsiniz. Üç nokta menüsünden sağ üste yeniden yerleştirilebilir.
+- Sağ alttaki tepsi simgesine tıklayarak veya sağ tık → **Odak’ı göster** ile pencereyi geri açabilirsiniz. Üç nokta menüsünden sağ üste yeniden yerleştirilebilir.
 - Pencereyi üstteki logo veya başlık alanından sol tıkla tutup sürükleyerek taşıyabilirsiniz. Konum kaydedilmez; her yeni açılışta yine sağ üst köşede başlar.
 - Kenarlardan veya sağ alt köşedeki tutamaktan pencereyi boyutlandırabilirsiniz. Boyut kaydedilir; sonraki açılışta bu boyutla sağ üstte açılır. Yeni görev, hatırlatma ve şablon pencereleri kendi üst barlarından taşınır; üstteki kutusuz `×` formu kapatır.
 - Uygulama birlikte gelen **Inter** yazı tipini kullanır; ayrıca font kurulumu gerekmez. Yazı tipi [SIL Open Font License 1.1](assets/fonts/OFL.txt) lisansıyla dağıtılır.
@@ -138,7 +161,7 @@ Sayaç tepsiye gizlendiğinde çalışır ve açılışlar arasında durumunu ko
 
 Üç nokta menüsünden:
 
-- **Dışa aktar:** görevleri, adımları, günlük sıralamayı, hatırlatma kurallarını ve şablonları taşınabilir JSON dosyasına kaydeder. Pencere ve sayaç ayarları JSON'a dahil edilmez.
+- **Dışa aktar:** görevleri, adımları, liste sıralarını, hatırlatma kurallarını ve şablonları taşınabilir JSON dosyasına kaydeder. Pencere ve sayaç ayarları JSON'a dahil edilmez.
 - **İçe aktar:** JSON'daki yeni kayıtları ekler. Aynı kimlikli mevcut kayıtları değiştirmez.
 - **Şimdi yedek al:** veritabanının güvenli anlık kopyasını alır.
 - **Yedekten geri yükle:** mevcut verileri seçilen yedekle değiştirir; işlem öncesi mevcut durumun yedeği alınır.
@@ -149,7 +172,7 @@ Uygulama açıkken günlük otomatik yedek alınır. Kullanılan veri klasörün
 
 ## Veriler
 
-Görevler, hatırlatmalar, şablonlar ve ayarlar her değişiklikte yerel SQLite veritabanına kaydedilir. Varsayılan konumlar:
+Görevler, hatırlatmalar, şablonlar ve ayarlar her değişiklikte yerel SQLite veritabanına kaydedilir. Windows'taki varsayılan konumlar aşağıdadır; diğer sistemlerin veri klasörleri **Linux ve macOS** bölümünde belirtilmiştir:
 
 | Dosya veya klasör | Tek komutla kurulum | Kaynak koddan çalıştırma |
 | --- | --- | --- |
@@ -161,7 +184,7 @@ Görevler, hatırlatmalar, şablonlar ve ayarlar her değişiklikte yerel SQLite
 
 Elle klasör yedeği almak için uygulamayı kapatıp veri klasörünün tamamını kopyalayın veya uygulamadaki yedekleme menüsünü kullanın. Eski sürümün görevleri ilk açılışta yeni alanlar eklenerek korunur.
 
-Deadline'lar bilgisayarın yerel saatine göre değerlendirilir. Otomatik başlatma, Windows hesabına girişte gerçekleşir. Windows'un güvenli masaüstü ve özel tam ekran uygulamaları normal pencere sıralamasını geçersiz kılabilir.
+Deadline'lar bilgisayarın yerel saatine göre değerlendirilir. Otomatik başlatma, kullanıcı oturumu açıldığında gerçekleşir. Windows'un güvenli masaüstü ve özel tam ekran uygulamaları normal pencere sıralamasını geçersiz kılabilir.
 
 ## Kaldırma
 

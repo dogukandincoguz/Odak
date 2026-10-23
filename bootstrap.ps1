@@ -3,7 +3,7 @@
 param(
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'Programs\Odak'),
     [string]$DataDir = '',
-    [string]$Ref = '13598e705eb974765e218f9b159c721e53645f24',
+    [string]$Ref = 'ae50f29bc22fd500836f6c6189b903d97dee0967',
     [ValidatePattern('^$|^[a-fA-F0-9]{64}$')]
     [string]$SourceSha256 = '',
     [string]$GitHubToken = $env:ODAK_GITHUB_TOKEN,
@@ -103,7 +103,12 @@ param(
 
     function Get-OdakUv {
         $command = Get-Command uv.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($command) { return $command.Source }
+        if ($command) {
+            $installedVersion = & $command.Source --version
+            if ($LASTEXITCODE -eq 0 -and $installedVersion -match '^uv (\d+\.\d+\.\d+)(?:\s|$)') {
+                if ([version]$Matches[1] -ge [version]'0.13.5') { return $command.Source }
+            }
+        }
         $version = '0.13.5'
         $architecture = $env:PROCESSOR_ARCHITECTURE
         if ($env:PROCESSOR_ARCHITEW6432) { $architecture = $env:PROCESSOR_ARCHITEW6432 }
@@ -130,7 +135,7 @@ param(
         # --system avoids choosing the environment that is being updated.
         $startInfo = New-Object Diagnostics.ProcessStartInfo
         $startInfo.FileName = $UvPath
-        $startInfo.Arguments = 'python find --system 3.13'
+        $startInfo.Arguments = 'python find --system 3.15.1'
         $startInfo.UseShellExecute = $false
         $startInfo.CreateNoWindow = $true
         $startInfo.RedirectStandardOutput = $true
@@ -146,19 +151,19 @@ param(
                 if ($process.ExitCode -eq 0 -and (Test-Path -LiteralPath $found -PathType Leaf)) { return $found }
             } finally { $process.Dispose() }
             if ($attempt -eq 0) {
-                Write-Host 'Python 3.13 uv ile kuruluyor...'
-                Invoke-OdakCommand $UvPath @('python', 'install', '3.13') | Out-Host
+                Write-Host 'Python 3.15.1 uv ile kuruluyor...'
+                Invoke-OdakCommand $UvPath @('python', 'install', '3.15.1') | Out-Host
             }
         }
-        throw 'Python 3.13 bulunamadi.'
+        throw 'Python 3.15.1 bulunamadi.'
     }
 
     try {
         if (-not $SourceSha256) {
-            if ($SourceArchive -or $Ref -ne '13598e705eb974765e218f9b159c721e53645f24') {
+            if ($SourceArchive -or $Ref -ne 'ae50f29bc22fd500836f6c6189b903d97dee0967') {
                 throw 'Farkli kaynak icin guvenilir bir -SourceSha256 degeri gerekli.'
             }
-            $SourceSha256 = '74f010226390c0de4fec866408232b9f5c02f7e262912112f32335b2bed7bee1'
+            $SourceSha256 = '3c8280cd5804873894de91e8b5fc8a2b71cd82bf4ffc1ad24cb1a0fab51354d2'
         }
         $InstallDir = [IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($InstallDir))
         $marker = Join-Path $InstallDir '.odak-install.json'
