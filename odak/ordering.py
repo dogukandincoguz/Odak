@@ -72,9 +72,10 @@ class TaskGrip(QToolButton):
 
 
 class TaskDropArea(QWidget):
-    def __init__(self, owner):
+    def __init__(self, owner, prepend_only=False):
         super().__init__()
         self.owner, self.indicator = owner, None
+        self.prepend_only = prepend_only
         self.setAcceptDrops(True)
 
     def eligible(self, event):
@@ -88,9 +89,11 @@ class TaskDropArea(QWidget):
             event.acceptProposedAction()
 
     def target(self, y):
+        if self.prepend_only:
+            y = -1
         for card in self.owner.cards:
             if y < card.geometry().center().y():
-                return card.task.id, False, card.y() - 7
+                return card.task.id, False, max(2, card.y() - 7)
         if self.owner.cards:
             card = self.owner.cards[-1]
             return card.task.id, True, card.geometry().bottom() + 7
@@ -98,24 +101,26 @@ class TaskDropArea(QWidget):
 
     def dragMoveEvent(self, event):
         if self.eligible(event):
-            target = self.target(event.position().y())
-            self.indicator = target[2] if target else None
             viewport = self.owner.scroll.viewport()
             local = viewport.mapFromGlobal(self.mapToGlobal(event.position().toPoint()))
             bar = self.owner.scroll.verticalScrollBar()
-            if local.y() < 40:
+            if self.prepend_only:
+                bar.setValue(0)
+            elif local.y() < 40:
                 bar.setValue(bar.value() - 20)
             elif local.y() > viewport.height() - 40:
                 bar.setValue(bar.value() + 20)
-            self.update()
+            target = self.target(event.position().y())
+            self.owner.list_widget.indicator = target[2] if target else None
+            self.owner.list_widget.update()
             event.acceptProposedAction()
 
     def dragLeaveEvent(self, event):
         self.clear_indicator()
 
     def clear_indicator(self):
-        self.indicator = None
-        self.update()
+        self.owner.list_widget.indicator = None
+        self.owner.list_widget.update()
 
     def dropEvent(self, event):
         if self.eligible(event):

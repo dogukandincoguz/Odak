@@ -105,6 +105,22 @@ try:
         window.set_tab("today")
         assert [card.task.id for card in window.cards] == identities[1:]+identities[:1], "Today must keep its own order"
 
+        # The header, hint and gap above the first card are invisible drop targets.
+        for tab in ("today", "active"):
+            window.set_tab(tab)
+            for target_widget, target_point in (
+                (window.section_title, window.section_title.rect().center()),
+                (window.section_hint, window.section_hint.rect().center()),
+                (window.list_header, QPoint(window.list_header.width()//2, window.list_header.height()-3)),
+            ):
+                app.processEvents()
+                initial = [card.task.id for card in window.cards]
+                grip = window.cards[-1].findChild(TaskGrip)
+                gesture(physical(grip), physical(target_widget, target_point))
+                expected = initial[-1:] + initial[:-1]
+                assert [card.task.id for card in window.cards] == expected, f"Header drop must prepend in {tab}"
+                assert window.list_widget.indicator is None, "The drop indicator must disappear after release"
+
         geometry = window.geometry()
         user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
         user32.GetWindow.argtypes = [wintypes.HWND, ctypes.c_uint]
@@ -152,4 +168,4 @@ try:
 finally:
     user32.SetCursorPos(original_cursor.x,original_cursor.y)
 
-print("Native Windows feature check: main/Today drag order, taskbar modes, corner resize and custom header move OK.")
+print("Native Windows feature check: main/Today drag order, invisible header drops, taskbar modes, corner resize and custom header move OK.")

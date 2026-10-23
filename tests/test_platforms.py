@@ -24,6 +24,31 @@ class PlatformTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
+    def test_desktop_icons_include_native_sizes_and_transparent_corners(self):
+        from PySide6.QtGui import QImageReader
+        assets = Path(__file__).resolve().parents[1] / "assets"
+        # Without a 256px ICO frame Windows can pad a small icon in its jumbo image list.
+        for filename, required in (
+            ("odak.ico", {16, 24, 32, 48, 256}),
+            ("odak.icns", {16, 32, 64, 128, 256, 512, 1024}),
+            ("odak.png", {256}),
+        ):
+            with self.subTest(filename=filename):
+                sizes = set()
+                reader = QImageReader(str(assets / filename))
+                for index in range(reader.imageCount()):
+                    reader = QImageReader(str(assets / filename))
+                    if index:
+                        self.assertTrue(reader.jumpToImage(index))
+                    image = reader.read()
+                    self.assertFalse(image.isNull(), reader.errorString())
+                    self.assertEqual(image.width(), image.height())
+                    self.assertTrue(image.hasAlphaChannel())
+                    self.assertEqual(image.pixelColor(0, 0).alpha(), 0)
+                    self.assertEqual(image.pixelColor(image.width() // 2, image.height() // 2).alpha(), 255)
+                    sizes.add(image.width())
+                self.assertTrue(required <= sizes, (required, sizes))
+
     def test_linux_autostart_uses_xdg_and_preserves_other_launchers(self):
         with patch.dict(os.environ, {'XDG_CONFIG_HOME': str(self.root)}):
             self.assertEqual(startup_directory('linux'), self.root / 'autostart')

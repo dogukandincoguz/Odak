@@ -50,7 +50,7 @@ Aynı kuruluma ait veri klasörü kurulum kaydından hatırlanır. Sistemin kal�
 
 ## Otomatik başlatma ve kapatma
 
-Kurulum, Windows hesabınıza girişte Odak'ı başlatan bir kısayol oluşturur. Üç nokta menüsündeki **Windows başlangıcı: etkin / devre dışı** satırına tıklayarak otomatik başlatmayı kapatıp açabilirsiniz. Bu işlem kullanılan veri klasörünü korur ve masaüstü kısayolunu değiştirmez. Elle kapatmak için `Win+R` → `shell:startup` klasöründeki **Odak** kısayolu da kaldırılabilir. Kurulum komutunu yeniden çalıştırmak bu kısayolu tekrar oluşturur; bunu istemiyorsanız `-NoShortcuts` seçeneğini kullanın.
+Kurulum, Windows hesabınıza girişte Odak'ı başlatan bir kısayol oluşturur. Üç nokta menüsündeki **Başlangıçta çalıştırma: etkin / devre dışı** satırına tıklayarak otomatik başlatmayı kapatıp açabilirsiniz. Satırın yanında tik bulunmaz; yazı mevcut durumu gösterir. Aynı menü Linux ve macOS'ta da kullanılabilir. Bu işlem kullanılan veri klasörünü korur ve masaüstü kısayolunu değiştirmez. Elle kapatmak için `Win+R` → `shell:startup` klasöründeki **Odak** kısayolu da kaldırılabilir. Kurulum komutunu yeniden çalıştırmak bu kısayolu tekrar oluşturur; bunu istemiyorsanız `-NoShortcuts` seçeneğini kullanın.
 
 Üç nokta menüsündeki **Görev çubuğunda göster** seçeneği açılışlar arasında hatırlanır. Açıkken **eksi** düğmesi pencereyi görev çubuğuna küçültür; kapalıyken sistem tepsisine gizler. Hatırlatmalar ve sayaç çalışmaya devam eder. **×** düğmesi uygulamayı tamamen kapatır. Bir sonraki Windows oturumunda otomatik başlatma etkinse yeniden açılır. Daha erken açmak için masaüstü kısayolunu kullanabilirsiniz.
 

@@ -49,8 +49,7 @@ class Startup:
 
     @property
     def label(self) -> str:
-        return {"win32": "Windows başlangıcı", "darwin": "macOS başlangıcı"}.get(
-            self.platform, "Oturum açılışında başlat")
+        return "Başlangıçta çalıştırma"
 
     @property
     def shortcut(self) -> Path:

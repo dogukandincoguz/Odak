@@ -62,6 +62,12 @@ QPushButton#tab { background: transparent; color: #96a3b8; border: none;
                  border-radius: 9px; padding: 11px 10px; font-size: 12px; }
 QPushButton#tab:hover { background: #202a3b; color: #e8edf7; }
 QPushButton#tab:checked { background: #2a2c46; color: #d5cdff; }
+QPushButton#templateAction { background: #39304f; color: #e0d5ff; border: 1px solid #77629b;
+    border-radius: 9px; padding: 10px 9px; font-size: 12px; }
+QPushButton#templateAction:hover { background: #493c65; border-color: #a799ff; }
+QPushButton#templateAction:pressed { background: #302841; }
+QPushButton#templateAction:focus { border-color: #b3a8ff; }
+QPushButton#templateAction:disabled { background: transparent; color: #96a3b8; border-color: transparent; }
 QFrame#tabs { background: transparent; border: none; }
 QPushButton#filterTab { background: #192232; border: 1px solid #2b374b;
     border-radius: 11px; padding: 0; }
@@ -148,11 +154,12 @@ def icon(kind: str, color: str = "#b9c4d7", size: int = 20) -> QIcon:
     return QIcon(pix)
 
 
-def app_icon() -> QIcon:
-    pix = QPixmap(128, 128)
+def app_icon(size: int = 128) -> QIcon:
+    pix = QPixmap(size, size)
     pix.fill(Qt.GlobalColor.transparent)
     p = QPainter(pix)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.scale(size / 128, size / 128)
     p.setPen(Qt.PenStyle.NoPen)
     p.setBrush(QColor("#a799ff"))
     p.drawRoundedRect(QRectF(4, 4, 120, 120), 32, 32)
@@ -315,7 +322,7 @@ class TaskDialog(StyledDialog):
         self.steps_fold = Foldout("Alt adımlar · her satıra bir adım", self.steps, bool(task and task.steps))
         layout.addWidget(self.steps_fold)
         save_template = QPushButton("Bu görevden şablon oluştur")
-        save_template.setObjectName("tab")
+        save_template.setObjectName("templateAction")
         save_template.setEnabled(bool(self.title.text().strip()))
         self.title.textChanged.connect(lambda t: save_template.setEnabled(bool(t.strip())))
         save_template.clicked.connect(self.save_as_template)
@@ -697,16 +704,24 @@ class MainWindow(QWidget):
             self.tabs[key] = button
         body.addWidget(tabs)
 
+        task_list = QVBoxLayout()
+        task_list.setContentsMargins(0, 0, 0, 0)
+        task_list.setSpacing(0)
+        self.list_header = TaskDropArea(self, prepend_only=True)
+        list_header_layout = QVBoxLayout(self.list_header)
+        list_header_layout.setContentsMargins(0, 0, 0, 14)
+        list_header_layout.setSpacing(14)
         section = QHBoxLayout()
         self.section_title = label("Görevlerin", "section")
         section.addWidget(self.section_title)
         section.addStretch()
         self.count_label = label("", "muted")
         section.addWidget(self.count_label)
-        body.addLayout(section)
+        list_header_layout.addLayout(section)
         self.section_hint = label("Deadline’ı yakın olanlar en üstte.", "muted", True)
         self.section_hint.setStyleSheet("font-size: 11px; color: #96a3b8;")
-        body.addWidget(self.section_hint)
+        list_header_layout.addWidget(self.section_hint)
+        task_list.addWidget(self.list_header)
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
@@ -718,7 +733,8 @@ class MainWindow(QWidget):
         self.task_layout.setSpacing(14)
         self.task_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.scroll.setWidget(self.list_widget)
-        body.addWidget(self.scroll, 1)
+        task_list.addWidget(self.scroll, 1)
+        body.addLayout(task_list, 1)
         self.notice = label("", wrap=True)
         self.notice.setStyleSheet("background: #263446; color: #b9e4d4; border-radius: 8px; padding: 8px; font-size: 11px;")
         self.notice.hide()
@@ -803,9 +819,7 @@ class MainWindow(QWidget):
         try:
             enabled = self.startup.enabled()
             startup = menu.addAction(self.startup.label + ": " + ("etkin" if enabled else "devre dışı"))
-            startup.setCheckable(True)
-            startup.setChecked(enabled)
-            startup.triggered.connect(self.set_startup_enabled)
+            startup.triggered.connect(self.toggle_startup)
         except OSError:
             startup = menu.addAction("Otomatik başlatma kullanılamıyor")
             startup.setEnabled(False)
@@ -824,9 +838,12 @@ class MainWindow(QWidget):
         finally:
             menu.deleteLater()
 
-    def set_startup_enabled(self, enabled):
+    def toggle_startup(self):
         try:
+            enabled = not self.startup.enabled()
             self.startup.set_enabled(enabled)
+            if self.startup.enabled() != enabled:
+                raise OSError("Başlangıçta çalıştırma ayarı güncellenemedi.")
         except OSError as exc:
             self.report_error(exc)
             return

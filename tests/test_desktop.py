@@ -159,23 +159,43 @@ class DesktopUiTests(unittest.TestCase):
         self.assertEqual(self.window.geometry(), geometry)
         menu.deleteLater()
 
-    @unittest.skipUnless(sys.platform == "win32", "Windows startup shortcut")
     def test_startup_menu_action_creates_and_removes_only_the_isolated_shortcut(self):
+        platforms = ["linux", "darwin"] + (["win32"] if sys.platform == "win32" else [])
+        for platform in platforms:
+            with self.subTest(platform=platform):
+                self.window.startup = Startup(PROJECT, self.root / "data", self.root / platform, platform=platform)
+                menu = self.window.create_menu()
+                action = next(action for action in menu.actions() if action.text().startswith("Başlangıçta çalıştırma:"))
+                self.assertTrue(action.isEnabled())
+                self.assertFalse(action.isCheckable())
+                self.assertEqual(action.text(), "Başlangıçta çalıştırma: devre dışı")
+                with patch.object(self.window, "report_error") as error:
+                    action.trigger()
+                    self.assertFalse(error.called, error.call_args)
+                self.assertTrue(self.window.startup.enabled())
+                untouched = self.window.startup.shortcut.parent / "other-launcher"
+                untouched.write_bytes(b"untouched")
+                menu.deleteLater()
+                menu = self.window.create_menu()
+                action = next(action for action in menu.actions() if action.text().startswith("Başlangıçta çalıştırma:"))
+                self.assertEqual(action.text(), "Başlangıçta çalıştırma: etkin")
+                self.assertFalse(action.isCheckable())
+                action.trigger()
+                self.assertFalse(self.window.startup.enabled())
+                self.assertEqual(untouched.read_bytes(), b"untouched")
+                menu.deleteLater()
+
+    def test_startup_failure_keeps_the_real_status_and_reports_the_error(self):
+        self.window.startup = Startup(PROJECT, self.root / "data", self.root / "startup", platform="linux")
         menu = self.window.create_menu()
-        action = next(action for action in menu.actions() if action.text().startswith("Windows başlangıcı:"))
-        self.assertTrue(action.isEnabled())
-        self.assertFalse(action.isChecked())
-        with patch.object(self.window, "report_error") as error:
+        action = next(action for action in menu.actions() if action.text().startswith("Başlangıçta çalıştırma:"))
+        with patch.object(self.window.startup, "set_enabled", side_effect=OSError("read only")), \
+             patch.object(self.window, "report_error") as error, patch.object(self.window, "notify") as notify:
             action.trigger()
-            self.assertFalse(error.called, error.call_args)
-        self.assertTrue(self.window.startup.enabled())
-        untouched = self.window.startup.shortcut.parent / "Other.lnk"
-        untouched.write_bytes(b"untouched")
+            error.assert_called_once()
+            notify.assert_not_called()
+        self.assertFalse(self.window.startup.enabled())
         menu.deleteLater()
         menu = self.window.create_menu()
-        action = next(action for action in menu.actions() if action.text().startswith("Windows başlangıcı:"))
-        self.assertTrue(action.isChecked())
-        action.trigger()
-        self.assertFalse(self.window.startup.enabled())
-        self.assertEqual(untouched.read_bytes(), b"untouched")
+        self.assertIn("Başlangıçta çalıştırma: devre dışı", [action.text() for action in menu.actions()])
         menu.deleteLater()
