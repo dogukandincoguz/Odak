@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QDate, QLocale, QPointF, QRectF, QSize, Qt, QTime, QTimer
 from PySide6.QtGui import (QColor, QFont, QFontDatabase, QIcon, QKeySequence, QPainter,
-                           QPainterPath, QPen, QPixmap, QShortcut)
+                           QPainterPath, QPen, QPixmap, QPixmapCache, QShortcut)
 from PySide6.QtWidgets import (QApplication, QCheckBox, QDateEdit, QDialog,
     QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QLineEdit, QMenu, QMessageBox, QPushButton,
     QScrollArea, QSizePolicy, QSystemTrayIcon, QTextEdit,
@@ -104,6 +104,10 @@ def configure_app(app: QApplication):
 
 
 def icon(kind: str, color: str = "#b9c4d7", size: int = 20) -> QIcon:
+    key = f"odak-vector-v1:{kind}:{color}:{size}"
+    cached = QPixmapCache.find(key)
+    if cached is not None:
+        return QIcon(cached)
     pix = QPixmap(size * 2, size * 2)
     pix.fill(Qt.GlobalColor.transparent)
     p = QPainter(pix)
@@ -140,6 +144,7 @@ def icon(kind: str, color: str = "#b9c4d7", size: int = 20) -> QIcon:
             p.drawEllipse(QRectF(10, y - 1, 3, 3))
     p.end()
     pix.setDevicePixelRatio(2)
+    QPixmapCache.insert(key, pix)
     return QIcon(pix)
 
 

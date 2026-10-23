@@ -15,14 +15,14 @@ UNDO_SECONDS = 10 * 60
 ORDERED_LISTS = ("active", "overdue", "someday", "done", "trash")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class Step:
     id: str
     title: str
     done: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class Task:
     id: str
     title: str
@@ -38,7 +38,7 @@ class Task:
     today_position: int | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class Reminder:
     id: str
     title: str
@@ -62,7 +62,7 @@ class Reminder:
     expires_at: datetime | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class Template:
     id: str
     name: str
